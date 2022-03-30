@@ -6,7 +6,7 @@ import "./abstract/Withdrawable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
-contract Beatsu is ERC721A, Ownable, Withdrawable {
+contract Royals is ERC721A, Ownable, Withdrawable {
     enum SaleState {
         Disabled,
         WhitelistSale
@@ -19,7 +19,7 @@ contract Beatsu is ERC721A, Ownable, Withdrawable {
 
     event SaleStateChanged(uint256 previousState, uint256 nextState, uint256 timestamp);
 
-    constructor(uint64 subscriptionId) ERC721A("Beatsu", "BEAT") VRFConsumerBaseV2(vrfCoordinator) {
+    constructor() ERC721A("Royals", "ROYLS") {
     
         
         //Defaults
@@ -38,7 +38,7 @@ contract Beatsu is ERC721A, Ownable, Withdrawable {
         bytes32[] calldata proof
     ) {
         require(
-            saleState == SaleState.PublicSale || _verify(_leaf(_address), proof),
+            saleState == SaleState.WhitelistSale || _verify(_leaf(_address), proof),
             "This address is not whitelisted or has reached maximum mints"
         );
         _;
@@ -55,8 +55,8 @@ contract Beatsu is ERC721A, Ownable, Withdrawable {
         //whitelist
         if (saleState == SaleState.WhitelistSale) {
             //this should require user to have at least 8 habibiz to burn
-            require( <= , "You don't have enough Habibiz to burn");
-            walletWhitelistMintedCount[msg.sender] += amount;
+            //require( <= , "You don't have enough Habibiz to burn");
+            
         }
         totalSupplyLeft -= amount;
         _safeMint(msg.sender, amount);
@@ -99,11 +99,8 @@ contract Beatsu is ERC721A, Ownable, Withdrawable {
         require(_exists(tokenId), "ERC721Metadata: URI query for nonexistent token");
         require(tokenId < (totalSupplyLeft + totalSupply()), "This token is greater than maxSupply");
 
-        if (revealedTokens[tokenId] == true || revealAll == true) {
-            return string(abi.encodePacked(revealUri, Strings.toString((tokenId + random) % (totalSupplyLeft + totalSupply())), ".json"));
-        } else {
-            return unRevealUri;
-        }
+        //return proper Uri
+        //return string(abi.encodePacked(revealUri, Strings(tokenId, ".json")));
     }
 
     function transferFrom(
@@ -111,7 +108,7 @@ contract Beatsu is ERC721A, Ownable, Withdrawable {
         address to,
         uint256 tokenId
     ) public virtual override {
-        require(transfersEnabled, "Transfers are currently disabled");
+        
         super.transferFrom(from, to, tokenId);
     }
 
@@ -121,14 +118,15 @@ contract Beatsu is ERC721A, Ownable, Withdrawable {
         uint256 tokenId,
         bytes memory _data
     ) public virtual override {
-        require(transfersEnabled, "Transfers are currently disabled");
+        
         super.safeTransferFrom(from, to, tokenId, _data);
     }
 
 
+    
+
+
 }
-
-
 
 
 
@@ -161,4 +159,5 @@ Project requirements:
 - staking 1 royal = 12000 OIL per day
 - staking 2 royals = 13500 OIL PER ROYAL per day
 - staking 3 royals = 15000 OIL PER ROYAL Per Day
-/*
+*/
+
