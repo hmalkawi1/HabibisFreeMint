@@ -39,10 +39,10 @@ contract Royals is ERC721A, Ownable, Withdrawable {
     bytes32 public root;
     string public baseURI;
     string public baseExtension = ".json";
-    ERC721Like Habibiz;
+    IERC20 public oil;
+    ERC721Like public Habibiz;
 
     mapping(address => uint256) mintAllowance;
-    IERC20 oil;
     //getaux setaux() <16 then mint 1, if <32 min 2
 
 
@@ -100,11 +100,11 @@ contract Royals is ERC721A, Ownable, Withdrawable {
 
         require(amount <= totalSupplyLeft, "Minting would exceed cap");
     
-        mintAllowance[msg.sender] -= amount;     
+        mintAllowance[msg.sender] -= amount;
         BatchSizeLeft-= amount;
         totalSupplyLeft -= amount;
         _safeMint(msg.sender, amount);
-        _setAux(_msgSender(), _getAux(msg.sender) - uint64(amount)); 
+        _setAux(_msgSender(), _getAux(msg.sender) - uint64(amount));
     }
 
     //Burns 8 at a time
