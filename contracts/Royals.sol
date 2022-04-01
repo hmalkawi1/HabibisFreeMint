@@ -5,7 +5,7 @@ import "erc721a/contracts/ERC721A.sol";
 import "./abstract/Withdrawable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
-
+import "hardhat/console.sol";
 
 
 // interface IERC721Enumerable is ERC721A {
@@ -82,15 +82,20 @@ contract Royals is ERC721A, Ownable, Withdrawable {
 
     // Payable mint function for unrevealed NFTs
     function mint(uint256 amount, bytes32[] calldata proof) external payable whenSaleIsActive isWhitelisted(msg.sender, amount, proof) {
-        require(BatchSizeLeft>0, "Theres none left in this batch to mint");
+        require(BatchSizeLeft > 0, "Theres none left in this batch to mint");
         //require(mintAllowance[msg.sender]> 0, "You have no mints left");
         //require(amount <= mintAllowance[msg.sender], "You do not have enough mints allowed");
-        
-        uint64 numMints = _getAux(msg.sender) - uint64(amount);
-        require(numMints <= maxMintPerWallet, "This value is greater than what you're allowed to mint");
 
-        //case of user inputs amount> batchsizeleft and hes allowed for more
-        if(amount> BatchSizeLeft && BatchSizeLeft>0 && amount+BatchSizeLeft <= 300){
+        uint64 numToPotentiallyMint = _getAux(msg.sender) + uint64(amount);
+
+        /* We should check the number they've minted PLUS the amount they want to mint and ensure that doesn't exceed the total allowabled mints */
+        require(numToPotentiallyMint <= maxMintPerWallet, "This value is greater than what you're allowed to mint");
+
+        /* Case of user inputs amount > batchsizeleft and he's able to mint more
+            I.e  when BatchSizeLeft = 2 but amount = 3, instead of reverting, just mint 2 as long as its less than total supply
+        */
+        // (amount + BatchSizeLeft) -> this should only be BatchSizeLeft, since we're taking the minimum of the two 
+        if( amount > BatchSizeLeft && BatchSizeLeft > 0 && (amount + BatchSizeLeft) <= totalSupplyLeft){
             mintAllowance[msg.sender] -= BatchSizeLeft;     
             BatchSizeLeft = 0;
             totalSupplyLeft -= BatchSizeLeft;
@@ -109,6 +114,8 @@ contract Royals is ERC721A, Ownable, Withdrawable {
 
     //Burns 8 at a time
     function burn(uint256[] calldata _habibiz) external {
+
+        
         require(_habibiz.length == 8, "You must burn exactly 8 a time");
         uint256 burntHabibiCounts = 0;
         for (uint256 i = 0; i < _habibiz.length; i++) {
@@ -242,7 +249,7 @@ contract Royals is ERC721A, Ownable, Withdrawable {
      * Returns the auxillary data for `owner`. (e.g. number of whitelist mint slots used).
      */
     // function _getAux(address owner) internal view returns (uint64) {
-    //     return _addressData[owner].aux;
+    //     return AddressData[owner].aux;
     // }
 
     /**
