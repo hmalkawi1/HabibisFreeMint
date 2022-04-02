@@ -62,6 +62,9 @@ describe("Royals", function () {
 
     });
 
+    describe("Burning", function () {
+    });
+
     it("Should check constructor values", async function () {
         expect(await royals.name()).to.equal("Royals");
         expect(await royals.Habibiz()).to.equal("0x98a0227E99E7AF0f1f0D51746211a245c3B859c2");

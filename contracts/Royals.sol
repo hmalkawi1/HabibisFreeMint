@@ -35,9 +35,10 @@ contract Royals is ERC721A, Ownable, Withdrawable {
 
     uint256 public totalSupplyLeft;
     uint256 public BatchSizeLeft;
-    uint256 public maxMintPerWallet;
+    //uint256 public maxMintPerWallet;
     bytes32 public root;
     string public baseURI;
+    string public notRevealedUri;
     string public baseExtension = ".json";
     IERC20Like public oil;
     ERC721Like public Habibiz;
@@ -49,12 +50,14 @@ contract Royals is ERC721A, Ownable, Withdrawable {
 
     event SaleStateChanged(uint256 previousState, uint256 nextState, uint256 timestamp);
 
-    constructor(address _habibiz,address _oil) ERC721A("Royals", "ROYLS") {
+    constructor(address _habibiz,address _oil, string memory _initBaseURI, string memory _initNotRevealedUri) ERC721A("Royals", "ROYLS") {
     
         Habibiz = ERC721Like(_habibiz);
         totalSupplyLeft = 300; //the initial supply   
         oil = IERC20Like(_oil);
         BatchSizeLeft = 0;
+        setBaseURI(_initBaseURI);
+        setNotRevealedURI(_initNotRevealedUri);
     }
 
     modifier whenSaleIsActive() {
@@ -159,12 +162,20 @@ contract Royals is ERC721A, Ownable, Withdrawable {
         BatchSizeLeft = size;
     }
 
-    function setMaxMintPerWallet(uint256 _maxMintPerWallet) public onlyOwner{
-        maxMintPerWallet = _maxMintPerWallet;
-    }
+    // function setMaxMintPerWallet(uint256 _maxMintPerWallet) public onlyOwner{
+    //     maxMintPerWallet = _maxMintPerWallet;
+    // }
 
     function setBaseExtension(string memory _newBaseExtension) public onlyOwner {
         baseExtension = _newBaseExtension;
+    }
+    
+    function setBaseURI(string memory _newBaseURI) public onlyOwner {
+        baseURI = _newBaseURI;
+    }
+
+    function setNotRevealedURI(string memory _notRevealedURI) public onlyOwner {
+        notRevealedUri = _notRevealedURI;
     }
 
     function withdraw() public payable onlyOwner {
@@ -186,6 +197,10 @@ contract Royals is ERC721A, Ownable, Withdrawable {
 
     function _verify(bytes32 leaf, bytes32[] memory proof) internal view returns (bool) {
         return MerkleProof.verify(proof, root, leaf);
+    }
+
+    function _baseURI() internal view virtual override returns (string memory) {
+        return baseURI;
     }
     
     //++++++++
