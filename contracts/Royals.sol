@@ -30,7 +30,8 @@ import "hardhat/console.sol";
 contract Royals is ERC721A, Ownable, Withdrawable {
     enum SaleState {
         Disabled,
-        WhitelistSale
+        WhitelistSale,
+        Public
     }
 
     uint256 public totalSupplyLeft;
@@ -75,7 +76,6 @@ contract Royals is ERC721A, Ownable, Withdrawable {
             saleState == SaleState.WhitelistSale || _verify(_leaf(_address), proof),
             "This address is not whitelisted or has reached maximum mints"
         );
-        console.logAddress(_address);
         _;
     }
 
@@ -108,26 +108,26 @@ contract Royals is ERC721A, Ownable, Withdrawable {
     // }
 
     // Use _getAux/setAux to be num of mints already occured 
-    function mint(uint256[] calldata _habibiz, bytes32[] calldata proof) external payable whenSaleIsActive isWhitelisted(msg.sender, proof) {
-
-        require(_habibiz.length % 8 == 0, "You must burn multiples of 8 habibz only");
+    function mint(uint256[] calldata _habibizTokenId, bytes32[] calldata proof) external payable whenSaleIsActive isWhitelisted(msg.sender, proof) {
+        require(_habibizTokenId.length >= 8, "You must burn atleast 8 habibz");
+        require(_habibizTokenId.length % 8 == 0, "You must burn multiples of 8 habibz only");
         // Count number of potential mints 
         uint256 numToMint = 0;
-        for (uint256 i = 0; i < _habibiz.length; i++){
-            require(Habibiz.ownerOf(_habibiz[i]) == msg.sender, "At least one Habibi is not owned by you.");
+        for (uint256 i = 0; i < _habibizTokenId.length; i++){
+            // require(Habibiz.ownerOf(_habibizTokenId[i]) == msg.sender, "At least one Habibi is not owned by you.");
             if ( i % 8 == 0) {
                 numToMint +=1;
             }
         }
         // Now that we have amount a user can mint, lets ensure they can mint given maximum mints per wallet, and batch size
-        require(numToMint >= BatchSizeLeft, "Theres none left in this batch to mint");
-        require(numToMint >= totalSupplyLeft, "Theres no more Royals to mint");
+        require(numToMint <= BatchSizeLeft, "Theres none left in this batch to mint");
+        require(numToMint <= totalSupplyLeft, "Theres no more Royals to mint");
         // Ensure user doesn't already exceed maximum number of mints
         require(_getAux(msg.sender) < maxMintPerWallet, "You do not have enough mints available");
         // Ensure user doesn't exceed maxmium allowable number of mints 
-        require(uint256(_getAux(msg.sender)) + numToMint <= maxMintPerWallet, "You do not have enough mints available");
+        require(uint256(_getAux(msg.sender)) + numToMint <= maxMintPerWallet, "Minting would exceed maximum allowable mints");
 
-        require(oil.burnHabibizForRoyals(msg.sender, _habibiz), "There was an issue with the burns");
+        require(oil.burnHabibizForRoyals(msg.sender, _habibizTokenId), "There was an issue with the burns");
 
         BatchSizeLeft-= numToMint;
         totalSupplyLeft -= numToMint;
@@ -265,6 +265,10 @@ contract Royals is ERC721A, Ownable, Withdrawable {
     /* DELETE LATER */
     function getAux(address owner) public view returns (uint64) {
         return _getAux(owner);
+    }
+
+    function setTotalSupplyLeft(uint256 _amount) public {
+        totalSupplyLeft = _amount;
     }
 
     /**
