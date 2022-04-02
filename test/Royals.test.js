@@ -12,24 +12,54 @@ describe("Royals", function () {
         const Royals = await hre.ethers.getContractFactory("Royals");
         royals = await Royals.deploy("0x98a0227E99E7AF0f1f0D51746211a245c3B859c2", "0xC14E154076DF2FdC68c9DC5664ae39c3ea0fBE17");
         await royals.deployed();
+
+        // const oil = await hre.ethers.getContractFactory("OIL");
+        // oil = await OIL.deploy();
+        // await oil.deployed();
     });
 
     describe("Minting", function () {
         it("Should not be possible to mint while sale is off", async function () {
-            await expect(royals.mint(1, [])).to.be.revertedWith("Sale is not active");
+            await expect(royals.mint([])).to.be.revertedWith("Sale is not active");
         });
 
         it("Should not be possible to mint over existing batch supply", async function () {
             await royals.setSaleState(1);
-            await expect(royals.mint(1, [])).to.be.revertedWith("Theres none left in this batch to mint");
+            await royals.setAux(deployer.address, 1); 
+            await expect(royals.mint([])).to.be.revertedWith("Theres none left in this batch to mint");
         });
 
-        it("Should not be possible to mint over maximum allowable mints per wallet", async function () {
+        it("Should not be possible to mint over what your allowed to", async function () {
             await royals.setSaleState(1);
             await royals.setBatchSize(15);
-            await royals.setMaxMintPerWallet(2);
-            await expect(royals.mint(3, [])).to.be.revertedWith("This value is greater than what you're allowed to mint");
+            //await royals.setMaxMintPerWallet(2);
+            await expect(royals.mint([])).to.be.revertedWith("You do not have enough mints available");
         });
+
+        it("should mint 1", async function(){
+            await royals.setSaleState(1);
+            //await royals.setMaxMintPerWallet(3);
+
+            const contractFromUser = await hre.ethers.getContractAt(
+                "Royals",
+                royals.address,
+                deployer
+            );
+            const prevTotalBalance = await royals.totalSupplyLeft();
+
+            await royals.setAux(deployer.address, 1); 
+            await royals.setBatchSize(15);
+
+            await contractFromUser.mint([]);
+
+            console.log( (await royals.totalSupplyLeft()).toNumber());
+
+            expect((await royals.totalSupplyLeft()).toNumber()).to.equal(
+                prevTotalBalance.sub(1).toNumber()
+            );
+
+        });
+
     });
 
     it("Should check constructor values", async function () {
