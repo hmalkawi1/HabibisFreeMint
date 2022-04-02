@@ -35,7 +35,7 @@ contract Royals is ERC721A, Ownable, Withdrawable {
 
     uint256 public totalSupplyLeft;
     uint256 public BatchSizeLeft;
-    //uint256 public maxMintPerWallet;
+    uint256 public maxMintPerWallet;
     bytes32 public root;
     string public baseURI;
     string public notRevealedUri;
@@ -107,36 +107,50 @@ contract Royals is ERC721A, Ownable, Withdrawable {
     //     _setAux(_msgSender(), _getAux(msg.sender) - uint64(amount));
     // }
 
-    function mint(bytes32[] calldata proof) external payable whenSaleIsActive isWhitelisted(msg.sender, proof) {
-        require(BatchSizeLeft > 0, "Theres none left in this batch to mint");
-        require(_getAux(msg.sender) > 0, "You do not have enough mints available");
-        
+    // Use _getAux/setAux to be num of mints already occured 
+    function mint(uint256[] calldata _habibiz, bytes32[] calldata proof) external payable whenSaleIsActive isWhitelisted(msg.sender, proof) {
 
-        //require(_getAux(msg.sender) <= totalSupplyLeft, "Minting would exceed cap");
-
-        BatchSizeLeft-= _getAux(msg.sender);
-        totalSupplyLeft -= _getAux(msg.sender);
-        _safeMint(msg.sender, _getAux(msg.sender));
-        _setAux(_msgSender(), uint64(0));
-    }
-
-    //Burns 8 at a time
-    //what if totalsupplyLeft =1, and 2 people call a burn ?
-    function burn(uint256[] calldata _habibiz) public {
-        require(totalSupplyLeft>0, "Theres no more Royals to mint");
-        require(_habibiz.length == 8, "You must burn exactly 8 a time");
-
-        uint256 burntHabibiCounts = 0;
-        for (uint256 i = 0; i < _habibiz.length; i++) {
+        require(_habibiz.length % 8 == 0, "You must burn multiples of 8 habibz only");
+        // Count number of potential mints 
+        uint256 numToMint = 0;
+        for (uint256 i = 0; i < _habibiz.length; i++){
             require(Habibiz.ownerOf(_habibiz[i]) == msg.sender, "At least one Habibi is not owned by you.");
-            burntHabibiCounts +=1;    
+            if ( i % 8 == 0) {
+                numToMint +=1;
+            }
         }
+        // Now that we have amount a user can mint, lets ensure they can mint given maximum mints per wallet, and batch size
+        require(numToMint >= BatchSizeLeft, "Theres none left in this batch to mint");
+        require(numToMint >= totalSupplyLeft, "Theres no more Royals to mint");
+        // Ensure user doesn't already exceed maximum number of mints
+        require(_getAux(msg.sender) < maxMintPerWallet, "You do not have enough mints available");
+        // Ensure user doesn't exceed maxmium allowable number of mints 
+        require(uint256(_getAux(msg.sender)) + numToMint <= maxMintPerWallet, "You do not have enough mints available");
 
         require(oil.burnHabibizForRoyals(msg.sender, _habibiz), "There was an issue with the burns");
-        
-        _setAux(msg.sender, _getAux(msg.sender) + 1);
 
+        BatchSizeLeft-= numToMint;
+        totalSupplyLeft -= numToMint;
+        _safeMint(msg.sender, numToMint);
+        _setAux(_msgSender(), uint64(numToMint));
     }
+
+    // Burns an array of habibz
+    // function burn(uint256[] calldata _habibiz) public {
+       
+    //     require(_habibiz.length == 8, "You must burn exactly 8 a time");
+
+    //     uint256 burntHabibiCounts = 0;
+    //     for (uint256 i = 0; i < _habibiz.length; i++) {
+    //         require(Habibiz.ownerOf(_habibiz[i]) == msg.sender, "At least one Habibi is not owned by you.");
+    //         burntHabibiCounts +=1;    
+    //     }
+
+    //     require(oil.burnHabibizForRoyals(msg.sender, _habibiz), "There was an issue with the burns");
+        
+    //     _setAux(msg.sender, _getAux(msg.sender) + 1);
+
+    // }
 
     
     //++++++++
@@ -162,9 +176,9 @@ contract Royals is ERC721A, Ownable, Withdrawable {
         BatchSizeLeft = size;
     }
 
-    // function setMaxMintPerWallet(uint256 _maxMintPerWallet) public onlyOwner{
-    //     maxMintPerWallet = _maxMintPerWallet;
-    // }
+    function setMaxMintPerWallet(uint256 _maxMintPerWallet) public onlyOwner{
+        maxMintPerWallet = _maxMintPerWallet;
+    }
 
     function setBaseExtension(string memory _newBaseExtension) public onlyOwner {
         baseExtension = _newBaseExtension;
