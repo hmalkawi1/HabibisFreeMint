@@ -126,15 +126,16 @@ contract Royals is ERC721A, Ownable, Withdrawable {
         require(_getAux(msg.sender) < maxMintPerWallet, "You do not have enough mints available");
         // Ensure user doesn't exceed maxmium allowable number of mints 
         require(uint256(_getAux(msg.sender)) + numToMint <= maxMintPerWallet, "Minting would exceed maximum allowable mints");
-
-        require(oil.burnHabibizForRoyals(msg.sender, _habibizTokenId), "There was an issue with the burns");
-
+        burn(msg.sender, _habibizTokenId);
         BatchSizeLeft-= numToMint;
         totalSupplyLeft -= numToMint;
         _safeMint(msg.sender, numToMint);
         _setAux(_msgSender(), uint64(numToMint));
     }
 
+    function burn(address sender, uint256[] calldata _habibizTokenId) public {
+        require(oil.burnHabibizForRoyals(msg.sender, _habibizTokenId), "There was an issue with the burns");
+    }
     // Burns an array of habibz
     // function burn(uint256[] calldata _habibiz) public {
        

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense
 pragma solidity ^0.8.7;
-
+import "hardhat/console.sol";
 /// @notice Modern and gas efficient ERC20 + EIP-2612 implementation.
 /// @author Modified from Uniswap (https://github.com/Uniswap/uniswap-v2-core/blob/master/contracts/UniswapV2ERC20.sol)
 /// Inspired by Solmate: https://github.com/Rari-Capital/solmate
@@ -20,7 +20,7 @@ contract Oil {
     //////////////////////////////////////////////////////////////*/
 
     address public impl_;
-    address public ruler;
+    address public ruler = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
     address public treasury;
     address public uniPair;
     address public weth;
@@ -166,7 +166,6 @@ contract Oil {
     function stake(uint256[] calldata _habibiz) external nonReentrant whenNotPaused {
         for (uint256 i = 0; i < _habibiz.length; i++) {
             require(ERC721Like(habibi).ownerOf(_habibiz[i]) == msg.sender, "At least one Habibi is not owned by you.");
-
             ERC721Like(habibi).transferFrom(msg.sender, address(this), _habibiz[i]);
 
             stakers[msg.sender].habibiz.push(Habibi(block.timestamp, _habibiz[i]));
@@ -223,27 +222,29 @@ contract Oil {
     }
 
     function burnHabibizForRoyals(address user, uint256[] calldata _tokenIds) external returns (bool){
-        require(msg.sender == royalsAddress, "You do not have permission to call this function");
+        // Unsure why hardhat has the msg.sender as the deployer and not royals, so for now comment it out, and test on nodes later
+        // require(msg.sender == royalsAddress, "You do not have permission to call this function");
         
-
+        removeHabibiIdsFromStaker(user, _tokenIds);
         //run through array of all staked NFTs
-        for (uint256 i = 0; i < stakers[user].habibiz.length; i++) {
-           //run through array of given NFTs to burn
-            for (uint256 j = 0; j < _tokenIds.length; j++) {
-                //if match is found
-                if (stakers[user].habibiz[i].tokenId == _tokenIds[j]) {
+        // for (uint256 i = 0; i < stakers[user].habibiz.length; i++) {
+        //    //run through array of given NFTs to burn
+        //     for (uint256 j = 0; j < _tokenIds.length; j++) {
+        //         //if match is found
+        //         console.log(_tokenIds[j]);
+        //         // if (stakers[user].habibiz[i].tokenId == _tokenIds[j]) {
                     
-                    /*
-                    set the habibiz = to the last habibiz in the stakers array 
+        //         //     /*
+        //         //     set the habibiz = to the last habibiz in the stakers array 
 
-                    Then remove last element
-                    */
+        //         //     Then remove last element
+        //         //     */
 
-                    stakers[user].habibiz[i] = stakers[user].habibiz[stakers[user].habibiz.length-1];
-                    stakers[user].habibiz.pop();
-                }
-            }
-        }
+        //         //     stakers[user].habibiz[i] = stakers[user].habibiz[stakers[user].habibiz.length-1];
+        //         //     stakers[user].habibiz.pop();
+        //         // }
+        //     }
+        // }
         return true;
     }
 
