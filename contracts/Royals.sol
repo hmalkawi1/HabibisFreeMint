@@ -2,35 +2,15 @@ pragma solidity 0.8.7;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "erc721a/contracts/ERC721A.sol";
-import "./abstract/Withdrawable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
 
-
-// interface IERC721Enumerable is ERC721A {
-//     /**
-//      * @dev Returns the total amount of tokens stored by the contract.
-//      */
-//     function totalSupply() external view returns (uint256);
-
-//     /**
-//      * @dev Returns a token ID owned by `owner` at a given `index` of its token list.
-//      * Use along with {balanceOf} to enumerate all of ``owner``'s tokens.
-//      */
-//     function tokenOfOwnerByIndex(address owner, uint256 index) external view returns (uint256 tokenId);
-
-//     /**
-//      * @dev Returns a token ID at a given `index` of all the tokens stored by the contract.
-//      * Use along with {totalSupply} to enumerate all tokens.
-//      */
-//     function tokenByIndex(uint256 index) external view returns (uint256);
-// }
-
-contract Royals is ERC721A, Ownable, Withdrawable {
+contract Royals is ERC721A, Ownable {
     enum SaleState {
         Disabled,
-        WhitelistSale
+        WhitelistSale,
+        PublicSale
     }
 
     uint256 public totalSupplyLeft;
@@ -38,24 +18,28 @@ contract Royals is ERC721A, Ownable, Withdrawable {
     uint256 public maxMintPerWallet;
     bytes32 public root;
     string public baseURI;
+    string public notRevealedUri;
     string public baseExtension = ".json";
-    ERC721Like Habibiz;
-
-    mapping(address => uint256) mintAllowance;
-    IERC20 oil;
-    //getaux setaux() <16 then mint 1, if <32 min 2
+    bool public revealed = false;
+    IERC20Like public oil;
+    ERC721Like public Habibiz;
 
 
     SaleState public saleState = SaleState.Disabled;
 
     event SaleStateChanged(uint256 previousState, uint256 nextState, uint256 timestamp);
+    event FrozenHabibz(uint256[] frozenTokenIds);
 
-    constructor(address _habibiz,address _oil) ERC721A("Royals", "ROYLS") {
+    constructor(address _habibiz,address _oil, string memory _initBaseURI, string memory _initNotRevealedUri, uint256 _maxMintPerWallet) ERC721A("Royals", "ROYLS") {
     
         Habibiz = ERC721Like(_habibiz);
         totalSupplyLeft = 300; //the initial supply   
-        oil = IERC20(_oil);
+        oil = IERC20Like(_oil);
         BatchSizeLeft = 0;
+        setBaseURI(_initBaseURI);
+        setNotRevealedURI(_initNotRevealedUri);
+        maxMintPerWallet = _maxMintPerWallet;
+        _startTokenId();
     }
 
     modifier whenSaleIsActive() {
@@ -66,12 +50,12 @@ contract Royals is ERC721A, Ownable, Withdrawable {
         // Check if the whitelist is enabled and the address is part of the whitelist
     modifier isWhitelisted(
         address _address,
-        uint256 amount,
         bytes32[] calldata proof
     ) {
+       
         require(
-            saleState == SaleState.WhitelistSale || _verify(_leaf(_address), proof),
-            "This address is not whitelisted or has reached maximum mints"
+            saleState == SaleState.PublicSale || _verify(_leaf(_address), proof),
+            "This address is not whitelisted"
         );
         _;
     }
@@ -80,56 +64,57 @@ contract Royals is ERC721A, Ownable, Withdrawable {
     // Public functions
     //++++++++
 
-    // Payable mint function for unrevealed NFTs
-    function mint(uint256 amount, bytes32[] calldata proof) external payable whenSaleIsActive isWhitelisted(msg.sender, amount, proof) {
-        require(BatchSizeLeft>0, "Theres none left in this batch to mint");
-        //require(mintAllowance[msg.sender]> 0, "You have no mints left");
-        //require(amount <= mintAllowance[msg.sender], "You do not have enough mints allowed");
+    // Use _getAux/setAux to be num of mints already occured 
+    function mint(uint256[] calldata _habibizTokenId, bytes32[] calldata proof) external payable whenSaleIsActive isWhitelisted(msg.sender, proof) {
+        require(_habibizTokenId.length >= 8, "You must burn atleast 8 habibz");
+        require(_habibizTokenId.length % 8 == 0, "You must burn multiples of 8 habibz only");
+
+        // Count number of potential mints 
+        uint256 numToMint = _habibizTokenId.length / 8;
+        bool duplicate = false;
+
+        //ensure no duplicates are submitted
+
+        // O(N^2) loop, its more gas efficient to use this than a mapping with addresses, due to lower storage usage
+        for(uint256 i = 0; i < _habibizTokenId.length; i++) {
+            for(uint256 j = i + 1; j < _habibizTokenId.length; j++) {
+                if(_habibizTokenId[i] == _habibizTokenId[j]) {
+                    duplicate = true;
+                    break;
+                }
+            }
+        }
+
+        require(duplicate == false, "These are not 8 unique NFTs or some of these NFTs have already been burnt");
+        // Now that we have amount a user can mint, lets ensure they can mint given maximum mints per wallet, and batch size
+        require(numToMint <= BatchSizeLeft, "Theres none left in this batch to mint or you have requested a higher mint than whats alloted for this batch");
+        require(numToMint <= totalSupplyLeft, "Theres no more Royals to mint or you have requested a higher mint than whats left in the supply");
+        // Ensure user doesn't already exceed maximum number of mints
+        require(_getAux(msg.sender) < maxMintPerWallet, "You do not have enough mints available");
+        // Ensure user doesn't exceed maxmium allowable number of mints 
+        require(uint256(_getAux(msg.sender)) + numToMint <= maxMintPerWallet, "Minting would exceed maximum allowable mints");
+        // Burns staked habibis and if there was an issue burning, it reverts
+        require(oil.burnHabibizForRoyals(msg.sender, _habibizTokenId), "There was an issue with the burns");
         
-        uint64 numMints = _getAux(msg.sender) - uint64(amount);
-        require(numMints <= maxMintPerWallet, "This value is greater than what you're allowed to mint");
+        BatchSizeLeft-= numToMint;
+        totalSupplyLeft -= numToMint;
+        _safeMint(msg.sender, numToMint);
+        _setAux(_msgSender(), uint64(numToMint) + _getAux(msg.sender));
+        emit FrozenHabibz(_habibizTokenId);
 
-        //case of user inputs amount> batchsizeleft and hes allowed for more
-        if(amount> BatchSizeLeft && BatchSizeLeft>0 && amount+BatchSizeLeft <= 300){
-            mintAllowance[msg.sender] -= BatchSizeLeft;     
-            BatchSizeLeft = 0;
-            totalSupplyLeft -= BatchSizeLeft;
-            _safeMint(msg.sender, BatchSizeLeft);
-            _setAux(_msgSender(), _getAux(msg.sender) - uint64(BatchSizeLeft)); 
-        }
-
-        require(amount <= totalSupplyLeft, "Minting would exceed cap");
-    
-        mintAllowance[msg.sender] -= amount;     
-        BatchSizeLeft-= amount;
-        totalSupplyLeft -= amount;
-        _safeMint(msg.sender, amount);
-        _setAux(_msgSender(), _getAux(msg.sender) - uint64(amount)); 
     }
-
-    //Burns 8 at a time
-    function burn(uint256[] calldata _habibiz) external {
-        require(_habibiz.length == 8, "You must burn exactly 8 a time");
-        uint256 burntHabibiCounts = 0;
-        for (uint256 i = 0; i < _habibiz.length; i++) {
-            require(Habibiz.ownerOf(_habibiz[i]) == msg.sender, "At least one Habibi is not owned by you.");
-            burntHabibiCounts +=1;    
-        }
-            //freeze all 8 at once
-            //freeze(_habibiz);
-
-        if(burntHabibiCounts % 8 == 0){
-            _setAux(msg.sender, _getAux(msg.sender) + 1);
-        }
-    }
-
     
+
     //++++++++
     // Owner functions
     //++++++++
 
     function setRoot(bytes32 _root) external onlyOwner {
         root = _root;
+    }
+
+    function reveal() public onlyOwner() {
+        revealed = true;
     }
 
     // Sale functions
@@ -154,6 +139,14 @@ contract Royals is ERC721A, Ownable, Withdrawable {
     function setBaseExtension(string memory _newBaseExtension) public onlyOwner {
         baseExtension = _newBaseExtension;
     }
+    
+    function setBaseURI(string memory _newBaseURI) public onlyOwner {
+        baseURI = _newBaseURI;
+    }
+
+    function setNotRevealedURI(string memory _notRevealedURI) public onlyOwner {
+        notRevealedUri = _notRevealedURI;
+    }
 
     function withdraw() public payable onlyOwner {
         (bool success, ) = payable(msg.sender).call{value: address(this).balance}("");
@@ -161,7 +154,7 @@ contract Royals is ERC721A, Ownable, Withdrawable {
     }
 
     function setOilAddress(address _oil) public onlyOwner {
-        oil = IERC20(_oil);
+        oil = IERC20Like(_oil);
     }
 
 
@@ -176,47 +169,36 @@ contract Royals is ERC721A, Ownable, Withdrawable {
         return MerkleProof.verify(proof, root, leaf);
     }
 
-    //function freeze(address msg.sender,uint256 _habibiz[i]) internal {
-        //must call OIL contract to freeze habibi and remove owner
-        //in the oil contract, must renounce ownership of _habibiz[i]
+    function _baseURI() internal view virtual override returns (string memory) {
+        return baseURI;
+    }
 
-        //Habibiz.ownerOf(_habibiz[i]) = address(oil);
-
-
-    //}
-
-
-    //
-    // function habibizOfStaker(address _staker) public view returns (uint256[] memory) {
-    //     uint256[] memory tokenIds = new uint256[](stakers[_staker].habibiz.length);
-    //     for (uint256 i = 0; i < stakers[_staker].habibiz.length; i++) {
-    //         tokenIds[i] = stakers[_staker].habibiz[i].tokenId;
-    //     }
-    //     return tokenIds;
-    // }
-
+    function _startTokenId() internal view virtual override returns (uint256) {
+        return 1;
+    }
     
     //++++++++
     // Override functions
     //++++++++
     function tokenURI(uint256 tokenId)
-    public
-    view
-    virtual
-    override
-    returns (string memory)
-  {
-    require(
-      _exists(tokenId),
-      "ERC721Metadata: URI query for nonexistent token"
-    );
-    
+        public
+        view
+        virtual
+        override
+        returns (string memory){
+                
+            require( _exists(tokenId),"ERC721Metadata: URI query for nonexistent token");
 
-    string memory currentBaseURI = _baseURI();
-    return bytes(currentBaseURI).length > 0
-        ? string(abi.encodePacked(currentBaseURI, Strings.toString(tokenId), baseExtension))
-        : "";
-  }
+            if(revealed == false) {
+                return notRevealedUri;
+            }
+        
+            string memory currentBaseURI = _baseURI();
+            return bytes(currentBaseURI).length > 0
+                ? string(abi.encodePacked(currentBaseURI, Strings.toString(tokenId), baseExtension))
+                : "";
+    }
+
 
     function transferFrom(
         address from,
@@ -238,61 +220,30 @@ contract Royals is ERC721A, Ownable, Withdrawable {
     }
 
 
-     /**
-     * Returns the auxillary data for `owner`. (e.g. number of whitelist mint slots used).
-     */
-    // function _getAux(address owner) internal view returns (uint64) {
-    //     return _addressData[owner].aux;
-    // }
-
-    /**
-     * Sets the auxillary data for `owner`. (e.g. number of whitelist mint slots used).
-     * If there are multiple variables, please pack them into a uint64.
-     */
-    // function _setAux(address owner, uint64 aux) internal {
-    //     _addressData[owner].aux = aux;
-    // }
-
-    /* Example for reveal
-    
-    function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
-        if (!_exists(tokenId)) revert URIQueryForNonexistentToken();
-        if (bytes(baseURI).length > 0) {
-            return string(abi.encodePacked(abi.encodePacked(baseURI, tokenId.toString()), ".json"));
-        } else {
-            if (tokenId % 2 == 0) {
-                return bytes(unrevealedURIs[0]).length != 0 ? unrevealedURIs[0] : "";
-            } else {
-                return bytes(unrevealedURIs[1]).length != 0 ? unrevealedURIs[1] : "";
-            }
-        }
+    /* ////////////////////////////////////////////////////////////////// DELETE LATER //////////////////////////////////////////////////////*/
+    function getAux(address owner) public view returns (uint64) {
+        return _getAux(owner);
     }
-    
-    
-    */
 
+    function setTotalSupplyLeft(uint256 _amount) public {
+        totalSupplyLeft = _amount;
+    }
 
-    //nice to haves:
-    // function walletOfOwner(address _owner) 
-    //     public
-    //     view
-    //     returns (
-    //         uint256[] memory){
-        
-    //     uint256 ownerTokenCount = balanceOf(_owner);
-    //     uint256[] memory tokenIds = new uint256[](ownerTokenCount);
-    //     for (uint256 i; i < ownerTokenCount; i++) {
-    //     tokenIds[i] = tokenOfOwnerByIndex(_owner, i);
-    //     }
-    //     return tokenIds;
-    // }
+    function getFrozenHabibiz() public view returns(uint256[] memory){
+        //habibiz.walletOfOwner(Oil address )
+        //only issue is this will return staked NFTs as well
 
-    // function tokenOfOwnerByIndex(address owner, uint256 index) public view virtual override returns (uint256) {
-    //     require(index < ERC721.balanceOf(owner), "ERC721Enumerable: owner index out of bounds");
-    //     return _ownedTokens[owner][index];
-    // }
+    }
+    function setAux(address owner, uint64 aux) public {
+        _setAux(owner, aux);
+    }
+
 
 }
+
+
+
+
 
 interface ERC721Like {
     function balanceOf(address holder_) external view returns (uint256);
@@ -310,41 +261,11 @@ interface ERC721Like {
     ) external;
 }
 
+interface IERC20Like{
+
+    function burnHabibizForRoyals(address user,uint256[] calldata _tokenIds) external returns (bool);
+}
 
 
-/*/
-Some questions:
-
-1- Do we want to just hardcode whitelist in contract and just have a setter function that can add to it? or merkletrees? - Keep merkle
-2- What do you want us to do with burns? just burn it or transfer to one of your wallets ? - Freeze(), remove owner from oil contract sice they're staked
-3- Are we doing 1 mint at a time, or should they mint multiples ? - limit mints per wallet
-4- Will they all be revealed right away? or will they mint unrevealed
-/*/
-
-//getAux setAux(uint) erc721, sets number minted for tokenOwner
-//override tokenstart to start from 1
-
-
-/*
-Project requirements:
-
-- Batches (decided by team)
-- 300 max NFT supply
-- Whitelist 
-- 8 Habibiz for 1 royal NFT mint
-
-
-
-//Think this is done in the OIL contract side ://
-
--Staking is time locked (30,60,90) 
-    -30 days: 15%
-    -60 days: 30%
-    -90 days: 100%
-
-- staking 1 royal = 12000 OIL per day
-- staking 2 royals = 13500 OIL PER ROYAL per day
-- staking 3 royals = 15000 OIL PER ROYAL Per Day
-*/
 
 
