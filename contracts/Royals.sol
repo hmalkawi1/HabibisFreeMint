@@ -95,8 +95,7 @@ contract Royals is ERC721A, Ownable {
         //ensure no duplicates are submitted
         
         for (uint256 k = 0; k < _habibizTokenId.length; k++){
-            
-            require(exists[_habibizTokenId[k]] == false, "You must submit 8 unique NFTs");
+            require(exists[_habibizTokenId[k]] == false, "Atleast one of your submitted habibz is not unique");
             if ( k % 8 == 0) {
                 numToMint +=1;
             }
@@ -235,10 +234,6 @@ contract Royals is ERC721A, Ownable {
 
 
     /* DELETE LATER */
-    function getAux(address owner) public view returns (uint64) {
-        return _getAux(owner);
-    }
-
     function setTotalSupplyLeft(uint256 _amount) public {
         totalSupplyLeft = _amount;
     }

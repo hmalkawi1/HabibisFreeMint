@@ -31,7 +31,7 @@ describe("Royals", function () {
 
     beforeEach(async function () {
         const Royals = await hre.ethers.getContractFactory("Royals");
-        royals = await Royals.deploy(habibz.address, oil.address, "", "");
+        royals = await Royals.deploy(habibz.address, oil.address, "", "", 3);
         await royals.deployed();
         // const oil = await hre.ethers.getContractFactory("OIL");
         // oil = await OIL.deploy();
@@ -41,6 +41,10 @@ describe("Royals", function () {
     describe("Minting Failure", function () {
         it("Should not be possible to mint while sale is off", async function () {
             await expect(royals.mint([], [])).to.be.revertedWith("Sale is not active");
+        });
+        it("Should not be possible to mint when i'm not whitelisted", async function () {
+            await royals.setSaleState(1);
+            await expect(royals.mint([], [])).to.be.revertedWith("This address is not whitelisted");
         });
 
         it("Should not be possible to mint when I burn less than 8 habibz", async function () {
@@ -103,81 +107,44 @@ describe("Royals", function () {
             oil.setRoyalsAddress(royals.address);
             await royals.setSaleState(2);
             await royals.setBatchSize(10);
+            await habibz.mint(24);
             await royals.setMaxMintPerWallet(3);
-            let habibzToBeBurned = [26,27,28,29,22,26,30,26];
+            let habibzToBeBurned = [26, 27, 28, 29, 22, 26, 30, 26];
 
-            await oil.stake([26,27,30]);
-            await expect(await royals.mint(habibzToBeBurned, [])).to.be.revertedWith("You must submit 8 unique NFTs");
-          
-
-            // let habibzToBeBurned2 = [];
-            // for (i = 0; i < 13; i++) {
-            //     habibzToBeBurned2.push(await habibz.tokenOfOwnerByIndex(deployer.address, i));
-            // }
-            // await oil.stake(habibzToBeBurned2);
-            // await royals.mint(habibzToBeBurned2, []);
-            // expect(await royals.getAux(deployer.address)).to.equal(2);
+            await oil.stake([26, 27, 30]);
+            expect(royals.mint(habibzToBeBurned, [])).to.be.revertedWith("Atleast one of your submitted habibz is not unique");
         });
     });
     describe("Minting Success", function () {
-        it("Should successfully mint 2 after burning exactly 8 staked habibz", async function () {
-            //await royals.setRoot("0x3034356532333961333939313837633066333666383461346365366235306563");
-            //console.log(await royals.root());
-            // oil.setRoyalsAddress(royals.address);
-            // await royals.setSaleState(2);
-            // await royals.setBatchSize(10);
-            // await royals.setMaxMintPerWallet(3);
-            // let habibzToBeBurned = [];
-            // for (i = 0; i < 24; i++) {
-            //     habibzToBeBurned.push(await habibz.tokenOfOwnerByIndex(deployer.address, i));
-            // }
-            // await oil.stake(habibzToBeBurned);
-            // await royals.mint(habibzToBeBurned, []);
-            // await expect(await royals.getAux(deployer.address)).to.equal(3);
-
-            // let habibzToBeBurned2 = [];
-            // for (i = 0; i < 13; i++) {
-            //     habibzToBeBurned2.push(await habibz.tokenOfOwnerByIndex(deployer.address, i));
-            // }
-            // await oil.stake(habibzToBeBurned2);
-            // await royals.mint(habibzToBeBurned2, []);
-            // expect(await royals.getAux(deployer.address)).to.equal(2);
-        });
-    });
-    describe("Burning", function () {
-        it("Should burn given habibz that are already staked", async function () {
-            await habibz.mint(24);
+        it("Should successfully mint 2 after burning exactly 16 staked habibz", async function () {
             oil.setRoyalsAddress(royals.address);
-            let testArr = [];
-            for (i = 0; i < 8; i++) {
-                testArr.push(await habibz.tokenOfOwnerByIndex(deployer.address, i));
+            await royals.setSaleState(2);
+            await royals.setBatchSize(10);
+            await royals.setMaxMintPerWallet(4);
+            let habibzToBeBurned = [];
+            for (i = 0; i < 16; i++) {
+                habibzToBeBurned.push(await habibz.tokenOfOwnerByIndex(deployer.address, i));
             }
-            await oil.stake(testArr);
-            const habibzStakedBeforeBurn = await oil.habibizOfStaker(deployer.address);
-            await royals.burn(deployer.address, habibzStakedBeforeBurn);
-            const habibzStakedAfterBurn = await oil.habibizOfStaker(deployer.address);
-            await expect(habibzStakedBeforeBurn).to.not.equal(habibzStakedAfterBurn);
+            await oil.stake(habibzToBeBurned);
+            await royals.mint(habibzToBeBurned, []);
+            await expect(await royals.balanceOf(deployer.address)).to.equal(2);
         });
-    });
 
-    it("should make sure the correct frozen habibis are added to the public array of frozen habibis", async function(){
-        oil.setRoyalsAddress(royals.address);
-        await habibz.mint(24);
-        await royals.setSaleState(2);
-        await royals.setBatchSize(10);
-        await royals.setMaxMintPerWallet(3);
-        let habibzToBeBurned = [];
-        for (i = 0; i < 24; i++) {
-            habibzToBeBurned.push(await habibz.tokenOfOwnerByIndex(deployer.address, i));
-        }
-        await oil.stake(habibzToBeBurned);
-        await royals.mint(habibzToBeBurned, []);
-        //await expect(await royals.getAux(deployer.address)).to.equal(3);
-        
-        console.log(await royals.getFrozenHabibiz());
-        
-
-
+        it("Should make sure the correct frozen habibis are added to the public array of frozen habibis", async function () {
+            oil.setRoyalsAddress(royals.address);
+            await habibz.mint(24);
+            await royals.setSaleState(2);
+            await royals.setBatchSize(10);
+            await royals.setMaxMintPerWallet(3);
+            let habibzToBeBurned = [];
+            for (i = 0; i < 24; i++) {
+                habibzToBeBurned.push(await habibz.tokenOfOwnerByIndex(deployer.address, i));
+            }
+            await oil.stake(habibzToBeBurned);
+            await royals.mint(habibzToBeBurned, []);
+            const frozenHabibiz = await royals.getFrozenHabibiz();
+            expect(frozenHabibiz.length).to.eq(24);
+        });
     });
 
     it("Should check constructor values", async function () {
