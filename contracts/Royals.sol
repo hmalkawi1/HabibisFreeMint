@@ -99,7 +99,6 @@ contract Royals is ERC721A, Ownable {
         uint256 numToMint = 0;
         //ensure no duplicates are submitted
         for (uint256 k = 0; k < _habibizTokenId.length; k++){
-            
             require(exists[_habibizTokenId[k]] == false, "These are not 8 unique NFTs or some of these NFTs have already been burnt");
             if ( k % 8 == 0) {
                 numToMint +=1;
@@ -122,9 +121,10 @@ contract Royals is ERC721A, Ownable {
         BatchSizeLeft-= numToMint;
         totalSupplyLeft -= numToMint;
         _safeMint(msg.sender, numToMint);
-        numToMint += _getAux(msg.sender);
         _setAux(_msgSender(), uint64(numToMint) + _getAux(msg.sender));
     }
+
+    
 
 
     
