@@ -225,6 +225,7 @@ contract Oil {
         require(msg.sender == royalsAddress, "You do not have permission to call this function");
         
         uint256[] memory habibzStaked = habibizOfStaker(user);
+       
 
         uint256 j = 0;
         uint256 i = 0;
