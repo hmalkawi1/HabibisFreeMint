@@ -127,7 +127,24 @@ describe("Royals", function () {
             }
             await oil.stake(habibzToBeBurned);
             await royals.mint(habibzToBeBurned, []);
-            await expect(await royals.balanceOf(deployer.address)).to.equal(2);
+            expect(await royals.balanceOf(deployer.address)).to.equal(2);
+        });
+
+        it("Should successfully mint 5 when there is exactly 5 total supply left", async function () {
+            oil.setRoyalsAddress(royals.address);
+            await royals.setSaleState(2);
+            await royals.setBatchSize(10);
+            await royals.setTotalSupplyLeft(5);
+            await habibz.mint(40);
+            await royals.setMaxMintPerWallet(10);
+            await habibz.setNftPerAddressLimit(200);
+            let habibzToBeBurned = [];
+            for (i = 0; i < 40; i++) {
+                habibzToBeBurned.push(await habibz.tokenOfOwnerByIndex(deployer.address, i));
+            }
+            await oil.stake(habibzToBeBurned);
+            await royals.mint(habibzToBeBurned, []);
+            expect(royals.mint(habibzToBeBurned, [])).to.be.revertedWith("Theres no more Royals to mint");
         });
 
         it("Should make sure the correct frozen habibis are added to the public array of frozen habibis", async function () {
