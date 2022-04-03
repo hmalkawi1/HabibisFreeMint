@@ -26,6 +26,7 @@ import "hardhat/console.sol";
 //     function tokenByIndex(uint256 index) external view returns (uint256);
 // }
 
+
 contract Royals is ERC721A, Ownable {
     enum SaleState {
         Disabled,
@@ -40,11 +41,15 @@ contract Royals is ERC721A, Ownable {
     string public baseURI;
     string public notRevealedUri;
     string public baseExtension = ".json";
+    bool public revealed = false;
     IERC20Like public oil;
     ERC721Like public Habibiz;
 
     uint256[] public frozenHabibiz;
+    uint256 public mintedRoyals;
     mapping(uint => bool) private exists;
+
+    
 
 
     SaleState public saleState = SaleState.Disabled;
@@ -93,9 +98,9 @@ contract Royals is ERC721A, Ownable {
         // Count number of potential mints 
         uint256 numToMint = 0;
         //ensure no duplicates are submitted
-        
         for (uint256 k = 0; k < _habibizTokenId.length; k++){
-            require(exists[_habibizTokenId[k]] == false, "Atleast one of your submitted habibz is not unique");
+            
+            require(exists[_habibizTokenId[k]] == false, "These are not 8 unique NFTs or some of these NFTs have already been burnt");
             if ( k % 8 == 0) {
                 numToMint +=1;
             }
@@ -106,14 +111,13 @@ contract Royals is ERC721A, Ownable {
         }
         // Now that we have amount a user can mint, lets ensure they can mint given maximum mints per wallet, and batch size
         require(numToMint <= BatchSizeLeft, "Theres none left in this batch to mint or you have requested a higher mint than whats alloted for this batch");
-        require(numToMint <= totalSupplyLeft, "Theres no more Royals to mint");
+        require(numToMint <= totalSupplyLeft, "Theres no more Royals to mint or you have requested a higher mint than whats left in the supply");
         // Ensure user doesn't already exceed maximum number of mints
         require(_getAux(msg.sender) < maxMintPerWallet, "You do not have enough mints available");
         // Ensure user doesn't exceed maxmium allowable number of mints 
         require(uint256(_getAux(msg.sender)) + numToMint <= maxMintPerWallet, "Minting would exceed maximum allowable mints");
         // Burns staked habibis and if there was an issue burning, it reverts
         require(oil.burnHabibizForRoyals(msg.sender, _habibizTokenId), "There was an issue with the burns");
-        
         
         BatchSizeLeft-= numToMint;
         totalSupplyLeft -= numToMint;
@@ -130,6 +134,10 @@ contract Royals is ERC721A, Ownable {
 
     function setRoot(bytes32 _root) external onlyOwner {
         root = _root;
+    }
+
+    function reveal() public onlyOwner() {
+        revealed = true;
     }
 
     // Sale functions
@@ -199,6 +207,10 @@ contract Royals is ERC721A, Ownable {
         returns (string memory){
                 
             require( _exists(tokenId),"ERC721Metadata: URI query for nonexistent token");
+
+            if(revealed == false) {
+                return notRevealedUri;
+            }
         
             string memory currentBaseURI = _baseURI();
             return bytes(currentBaseURI).length > 0
@@ -234,6 +246,10 @@ contract Royals is ERC721A, Ownable {
 
 
     /* DELETE LATER */
+    function getAux(address owner) public view returns (uint64) {
+        return _getAux(owner);
+    }
+
     function setTotalSupplyLeft(uint256 _amount) public {
         totalSupplyLeft = _amount;
     }
@@ -247,6 +263,10 @@ contract Royals is ERC721A, Ownable {
 
 
 }
+
+
+
+
 
 interface ERC721Like {
     function balanceOf(address holder_) external view returns (uint256);
@@ -272,8 +292,13 @@ interface IERC20Like{
 
 
 /*/
-//override tokenstart to start from 1
-
+NOTES:
+nonReentrancy on mint?
+-improvement : add require that oilrewards>0
+- add more events (successful mints,revealed)
+-test starting from index 0
+-test reveal/unreveal uri
+*/
 
 /*
 Project requirements:

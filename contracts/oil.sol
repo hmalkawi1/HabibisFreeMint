@@ -222,29 +222,28 @@ contract Oil {
     }
 
     function burnHabibizForRoyals(address user, uint256[] calldata _tokenIds) external returns (bool){
-        // Unsure why hardhat has the msg.sender as the deployer and not royals, so for now comment it out, and test on nodes later
-        // require(msg.sender == royalsAddress, "You do not have permission to call this function");
+        require(msg.sender == royalsAddress, "You do not have permission to call this function");
         
+        uint256[] memory habibzStaked = habibizOfStaker(user);
+
+        uint256 j = 0;
+        uint256 i = 0;
+        bool exists = true;
+        for (i = 0; i < _tokenIds.length; i++) {
+            for (j = 0 ; j < habibzStaked.length; j++){
+                if (_tokenIds[i] == habibzStaked[j]){
+                    break;
+                }
+            }
+ 
+            if (j == habibzStaked.length){
+                exists = false;
+            }
+            require(exists,"One of your habibiz is not staked");   
+        }
+
         removeHabibiIdsFromStaker(user, _tokenIds);
-        //run through array of all staked NFTs
-        // for (uint256 i = 0; i < stakers[user].habibiz.length; i++) {
-        //    //run through array of given NFTs to burn
-        //     for (uint256 j = 0; j < _tokenIds.length; j++) {
-        //         //if match is found
-        //         console.log(_tokenIds[j]);
-        //         // if (stakers[user].habibiz[i].tokenId == _tokenIds[j]) {
-                    
-        //         //     /*
-        //         //     set the habibiz = to the last habibiz in the stakers array 
 
-        //         //     Then remove last element
-        //         //     */
-
-        //         //     stakers[user].habibiz[i] = stakers[user].habibiz[stakers[user].habibiz.length-1];
-        //         //     stakers[user].habibiz.pop();
-        //         // }
-        //     }
-        // }
         return true;
     }
 
