@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: Unlicense
 pragma solidity ^0.8.7;
+
+import "erc721a/contracts/ERC721A.sol";
+
 import "hardhat/console.sol";
 /// @notice Modern and gas efficient ERC20 + EIP-2612 implementation.
 /// @author Modified from Uniswap (https://github.com/Uniswap/uniswap-v2-core/blob/master/contracts/UniswapV2ERC20.sol)
@@ -34,6 +37,7 @@ contract Oil {
     bool public swapping;
 
     ERC721Like public habibi;
+    ERC721A public royals;
 
     mapping(address => uint256) public balanceOf;
 
@@ -77,6 +81,25 @@ contract Oil {
         Habibi[] habibiz;
         uint256 lastClaim;
     }
+
+    struct Royals {
+        uint256 stakedTimestamp;
+        uint256 tokenId;
+    }
+    struct RoyalsStaker {
+        Royals[] royals;
+        uint256 lastClaim;
+        uint256 timestamp;
+        uint256 base;
+    }
+
+     // map staker address to stake details
+    mapping(address => RoyalsStaker) public royalsStaker;
+    mapping(address => RoyalsStaker) internal royalsStakers;
+
+    // map staker to total staking time 
+    mapping(address => uint256) public stakingTimeRoyals;
+
     /*/////////////////////////////////////////////////////////////
                         Tsuki Lab Addition
     ////////////////////////////////////////////////////////////*/
@@ -246,6 +269,164 @@ contract Oil {
         removeHabibiIdsFromStaker(user, _tokenIds);
 
         return true;
+    }
+
+     /*/////////////////////////////////////////////////////
+                    Royals Staking and rewards
+    ////////////////////////////////////////////////////*/
+
+    function royalsOfStaker(address _staker) public view returns (uint256[] memory) {
+        uint256[] memory tokenIds = new uint256[](royalsStakers[_staker].royals.length);
+        for (uint256 i = 0; i < royalsStakers[_staker].royals.length; i++) {
+            tokenIds[i] = royalsStakers[_staker].royals[i].tokenId;
+        }
+        return tokenIds;
+    }
+
+    function removeRoyalsIdsFromStaker(address _staker, uint256[] memory _tokenIds) internal {
+        for (uint256 i = 0; i < _tokenIds.length; i++) {
+            for (uint256 j = 0; j < royalsStakers[_staker].royals.length; j++) {
+                if (_tokenIds[i] == royalsStakers[_staker].royals[j].tokenId) {
+                    royalsStakers[_staker].royals[j] = royalsStakers[_staker].royals[royalsStakers[_staker].royals.length - 1];
+                    royalsStakers[_staker].royals.pop();
+                }
+            }
+        }
+    }
+
+    function unstakeRoyalsByIds(uint256[] calldata _tokenIds) external nonReentrant whenNotPaused {
+        //must get rewards of given NFTs
+        //require(user is not sending all staked nfts, "you should unstakeAll() instead")
+        //do double forloop to find nfts user is wanting to unstake, then calculate.
+        uint256 oilRewards = calculateRoyalsOilRewards(msg.sender);
+        for (uint256 i = 0; i < _tokenIds.length; i++) {
+            bool owned = false;
+            for (uint256 j = 0; j < royalsStakers[msg.sender].royals.length; j++) {
+                if (royalsStakers[msg.sender].royals[j].tokenId == _tokenIds[i]) {
+                    owned = true;
+                }
+            }
+            require(owned, "TOKEN NOT OWNED BY SENDER");
+           
+            ERC721A(royals).transferFrom(address(this), msg.sender, _tokenIds[i]);
+        }
+        removeRoyalsIdsFromStaker(msg.sender, _tokenIds);
+        
+        royalsStaker[msg.sender].lastClaim = block.timestamp;
+
+        _mint(msg.sender, oilRewards);
+
+        if(royalsStaker[msg.sender].royals.length == 0){
+            royalsStaker[msg.sender].base = 0;
+        }
+        if(royalsStaker[msg.sender].royals.length == 1){
+                royalsStaker[msg.sender].base = 12000;
+        }
+        if(royalsStaker[msg.sender].royals.length == 2){
+            royalsStaker[msg.sender].base = 13500;
+        }
+        if(royalsStaker[msg.sender].royals.length >= 3){
+            royalsStaker[msg.sender].base = 15000;
+        }
+
+        
+    }
+
+    function stakeRoyals(uint256[] calldata _royalsTokenId) external nonReentrant whenNotPaused {
+
+        for (uint256 i = 0; i < _royalsTokenId.length; i++){
+            
+            require(royals.ownerOf(_royalsTokenId[i]) == msg.sender, "At least one Royals is not owned by you.");
+
+            royals.transferFrom(msg.sender, address(this), _royalsTokenId[i]);
+
+            royalsStaker[msg.sender].royals.push(Royals(block.timestamp, _royalsTokenId[i]));
+        }
+
+        //set base based on how many nfts user has staked
+        if(royalsStaker[msg.sender].royals.length == 1){
+                royalsStaker[msg.sender].base = 12000;
+        }
+        if(royalsStaker[msg.sender].royals.length == 2){
+            royalsStaker[msg.sender].base = 13500;
+        }
+        if(royalsStaker[msg.sender].royals.length >= 3){
+            royalsStaker[msg.sender].base = 15000;
+        }
+        
+
+    } 
+
+    function unstakeAllRoyals() external nonReentrant whenNotPaused {
+        uint256 oilRewards = calculateRoyalsOilRewards(msg.sender);
+        uint256[] memory tokenIds = royalsOfStaker(msg.sender);
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            ERC721A(royals).transferFrom(address(this), msg.sender, tokenIds[i]);
+            tokenIds[i] = royalsStakers[msg.sender].royals[i].tokenId;
+        }
+        removeRoyalsIdsFromStaker(msg.sender, tokenIds);
+        //This needs modification since we dont save last Claim?
+        royalsStakers[msg.sender].lastClaim = block.timestamp;
+        _mint(msg.sender, oilRewards);
+        //reset their base
+        royalsStaker[msg.sender].base = 0;
+    }
+
+    function calculateRoyalsOilRewards(address _staker) public view returns (uint256 oilAmount) {
+    
+        for (uint256 i = 0; i < royalsStakers[_staker].royals.length; i++) {
+           uint256 royalsId = royalsStakers[_staker].royals[i].tokenId;
+            oilAmount =
+                oilAmount +
+                calculateOilOfRoyals(
+                    royalsStakers[_staker].lastClaim,
+                    royalsStakers[_staker].royals[i].stakedTimestamp,
+                    block.timestamp,
+                    royalsStaker[_staker].base
+                );
+        }
+    }
+
+    function calculateOilOfRoyals(      
+        uint256 _lastClaimedTimestamp,
+        uint256 _stakedTimestamp,
+        uint256 _currentTimestamp,
+        uint256 _base
+    ) internal pure returns (uint256 oil) {
+        uint256 bonusPercentage;
+        uint256 unclaimedTime;
+        uint256 stakedTime = _currentTimestamp - _stakedTimestamp;
+        if (_lastClaimedTimestamp < _stakedTimestamp) {
+            _lastClaimedTimestamp = _stakedTimestamp;
+        }
+
+        unclaimedTime = _currentTimestamp - _lastClaimedTimestamp;
+
+        if (stakedTime >= 30 days && stakedTime < 60 days) {
+            bonusPercentage = 15;
+        }
+
+        if (stakedTime >= 60 days && stakedTime < 90 days) {
+            bonusPercentage = 30;
+        }
+
+        if (stakedTime >= 90 days) {
+            bonusPercentage = 100;
+        }
+
+        oil = (unclaimedTime * 1 ether * _base) / 1 days;
+        oil = oil + ((oil * bonusPercentage) / 100);
+    }
+    
+
+    function claimRoyal() external nonReentrant whenNotPaused {
+        uint256 oil = calculateRoyalsOilRewards(msg.sender);
+        if (oil > 0) {
+            royalsStakers[msg.sender].lastClaim = block.timestamp;
+            _mint(msg.sender, oil);
+        } else {
+            revert("Not enough oil");
+        }
     }
 
     /*///////////////////////////////////////////////////////////////
