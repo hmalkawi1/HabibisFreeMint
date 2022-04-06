@@ -24,4 +24,19 @@ module.exports = {
         coinmarketcap: "2bd639b0-ef37-4768-8aa5-b1f6dd6ed437",
         currency: "USD",
     },
+    networks:{
+        hardhat: {
+            allowUnlimitedContractSize : true,
+        }
+    },
+
+    settings: {
+        optimizer: {
+          enabled: true,
+          runs: 200,
+        },
+      },
+    allowUnlimitedContractSize: true,
+    blockGasLimit: 0x1fffffffffffff,
+
 };

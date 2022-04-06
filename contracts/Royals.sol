@@ -12,17 +12,17 @@ contract Royals is ERC721A, Ownable {
         WhitelistSale,
         PublicSale
     }
-
     uint256 public totalSupplyLeft;
     uint256 public BatchSizeLeft;
     uint256 public maxMintPerWallet;
+    uint256 public amountRequiredToBurn;
     bytes32 public root;
     string public baseURI;
     string public notRevealedUri;
     string public baseExtension = ".json";
     bool public revealed = false;
     IERC20Like public oil;
-    ERC721Like public Habibiz;
+    IERC721Like public Habibiz;
 
 
     SaleState public saleState = SaleState.Disabled;
@@ -30,9 +30,9 @@ contract Royals is ERC721A, Ownable {
     event SaleStateChanged(uint256 previousState, uint256 nextState, uint256 timestamp);
     event FrozenHabibz(uint256[] frozenTokenIds);
 
-    constructor(address _habibiz,address _oil, string memory _initBaseURI, string memory _initNotRevealedUri, uint256 _maxMintPerWallet) ERC721A("Royals", "ROYLS") {
+    constructor(address _habibiz,address _oil, string memory _initBaseURI, string memory _initNotRevealedUri, uint256 _maxMintPerWallet) ERC721A("Royals", "ROYALS") {
     
-        Habibiz = ERC721Like(_habibiz);
+        Habibiz = IERC721Like(_habibiz);
         totalSupplyLeft = 300; //the initial supply   
         oil = IERC20Like(_oil);
         BatchSizeLeft = 0;
@@ -40,6 +40,7 @@ contract Royals is ERC721A, Ownable {
         setNotRevealedURI(_initNotRevealedUri);
         maxMintPerWallet = _maxMintPerWallet;
         _startTokenId();
+        amountRequiredToBurn = 8;
     }
 
     modifier whenSaleIsActive() {
@@ -66,11 +67,11 @@ contract Royals is ERC721A, Ownable {
 
     // Use _getAux/setAux to be num of mints already occured 
     function mint(uint256[] calldata _habibizTokenId, bytes32[] calldata proof) external payable whenSaleIsActive isWhitelisted(msg.sender, proof) {
-        require(_habibizTokenId.length >= 8, "You must burn atleast 8 habibz");
-        require(_habibizTokenId.length % 8 == 0, "You must burn multiples of 8 habibz only");
+        require(_habibizTokenId.length >= amountRequiredToBurn, "You must burn atleast required amount of habibz");
+        require(_habibizTokenId.length % amountRequiredToBurn == 0, "You must burn multiples of the required amount of habibz only");
 
         // Count number of potential mints 
-        uint256 numToMint = _habibizTokenId.length / 8;
+        uint256 numToMint = _habibizTokenId.length / amountRequiredToBurn;
         bool duplicate = false;
 
         //ensure no duplicates are submitted
@@ -85,7 +86,7 @@ contract Royals is ERC721A, Ownable {
             }
         }
 
-        require(duplicate == false, "These are not 8 unique NFTs or some of these NFTs have already been burnt");
+        require(duplicate == false, "some of your inputs were not unique NFTs or some of these NFTs have already been burnt");
         // Now that we have amount a user can mint, lets ensure they can mint given maximum mints per wallet, and batch size
         require(numToMint <= BatchSizeLeft, "Theres none left in this batch to mint or you have requested a higher mint than whats alloted for this batch");
         require(numToMint <= totalSupplyLeft, "Theres no more Royals to mint or you have requested a higher mint than whats left in the supply");
@@ -219,6 +220,19 @@ contract Royals is ERC721A, Ownable {
         super.safeTransferFrom(from, to, tokenId, _data);
     }
 
+    function walletOfOwner(address _owner) public virtual view returns (uint256[] memory) {
+        uint256 _balance = balanceOf(_owner);
+        uint256[] memory _tokens = new uint256[](_balance);
+        uint _index;
+        uint256 _loopThrough = totalSupply();
+        for (uint256 i = 1; i< _loopThrough; i++){
+            if(ownerOf(i) == _owner){
+                _tokens[_index] = i;
+                _index++;
+            }
+        }
+        return _tokens;
+    }
 
     /* ////////////////////////////////////////////////////////////////// DELETE LATER //////////////////////////////////////////////////////*/
     function getAux(address owner) public view returns (uint64) {
@@ -245,7 +259,7 @@ contract Royals is ERC721A, Ownable {
 
 
 
-interface ERC721Like {
+interface IERC721Like {
     function balanceOf(address holder_) external view returns (uint256);
 
     function ownerOf(uint256 id_) external view returns (address);
@@ -265,6 +279,8 @@ interface IERC20Like{
 
     function burnHabibizForRoyals(address user,uint256[] calldata _tokenIds) external returns (bool);
 }
+
+
 
 
 

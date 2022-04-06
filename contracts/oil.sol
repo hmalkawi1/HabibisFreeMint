@@ -75,11 +75,13 @@ contract Oil {
     struct Habibi {
         uint256 stakedTimestamp;
         uint256 tokenId;
+        //bool isRoyal
     }
 
     struct Staker {
         Habibi[] habibiz;
         uint256 lastClaim;
+        //royalcount
     }
 
     struct Royals {
@@ -635,17 +637,6 @@ contract Oil {
         _approve(address(this),address(uniswapV2Router), _oilAmount);
         _approve(address(this),address(uniswapV2Router), _ethAmount);
 
-
-        //this is if you desire to use ETH
-        //(uint amountToken, uint amountETH, uint liquidity) =
-        // uniswapV2Router.addLiquidityETH{value: msg.sender}(
-        // address(this),
-        // _oilAmount,
-        // 0,
-        // 0,
-        // msg.sender,
-        // block.timestamp +360
-        // );
 
         // this is if you want to use WETH
         (uint oilAmount, uint _ethAmount, uint liquidity) =
