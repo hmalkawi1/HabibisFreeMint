@@ -5,13 +5,13 @@ import "erc721a/contracts/ERC721A.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
-
 contract Royals is ERC721A, Ownable {
     enum SaleState {
         Disabled,
         WhitelistSale,
         PublicSale
     }
+
     uint256 public totalSupplyLeft;
     uint256 public BatchSizeLeft;
     uint256 public maxMintPerWallet;
@@ -22,7 +22,7 @@ contract Royals is ERC721A, Ownable {
     string public baseExtension = ".json";
     bool public revealed = false;
     IERC20Like public oil;
-    IERC721Like public Habibiz;
+    ERC721Like public Habibiz;
 
 
     SaleState public saleState = SaleState.Disabled;
@@ -32,7 +32,7 @@ contract Royals is ERC721A, Ownable {
 
     constructor(address _habibiz,address _oil, string memory _initBaseURI, string memory _initNotRevealedUri, uint256 _maxMintPerWallet) ERC721A("Royals", "ROYALS") {
     
-        Habibiz = IERC721Like(_habibiz);
+        Habibiz = ERC721Like(_habibiz);
         totalSupplyLeft = 300; //the initial supply   
         oil = IERC20Like(_oil);
         BatchSizeLeft = 0;
@@ -114,6 +114,10 @@ contract Royals is ERC721A, Ownable {
         root = _root;
     }
 
+    function setTotalSupplyLeft(uint256 _amount) public onlyOwner{
+        totalSupplyLeft = _amount;
+    }
+
     function reveal() public onlyOwner() {
         revealed = true;
     }
@@ -156,6 +160,10 @@ contract Royals is ERC721A, Ownable {
 
     function setOilAddress(address _oil) public onlyOwner {
         oil = IERC20Like(_oil);
+    }
+
+    function setAmountRequiredToBurn(uint256 _amountRequiredToBurn) public onlyOwner{
+        amountRequiredToBurn = _amountRequiredToBurn;
     }
 
 
@@ -225,41 +233,18 @@ contract Royals is ERC721A, Ownable {
         uint256[] memory _tokens = new uint256[](_balance);
         uint _index;
         uint256 _loopThrough = totalSupply();
-        for (uint256 i = 1; i< _loopThrough; i++){
+        for (uint256 i = 1; i<= _loopThrough; i++){
             if(ownerOf(i) == _owner){
                 _tokens[_index] = i;
                 _index++;
             }
         }
+
         return _tokens;
     }
-
-    /* ////////////////////////////////////////////////////////////////// DELETE LATER //////////////////////////////////////////////////////*/
-    function getAux(address owner) public view returns (uint64) {
-        return _getAux(owner);
-    }
-
-    function setTotalSupplyLeft(uint256 _amount) public {
-        totalSupplyLeft = _amount;
-    }
-
-    function getFrozenHabibiz() public view returns(uint256[] memory){
-        //habibiz.walletOfOwner(Oil address )
-        //only issue is this will return staked NFTs as well
-
-    }
-    function setAux(address owner, uint64 aux) public {
-        _setAux(owner, aux);
-    }
-
-
 }
 
-
-
-
-
-interface IERC721Like {
+interface ERC721Like {
     function balanceOf(address holder_) external view returns (uint256);
 
     function ownerOf(uint256 id_) external view returns (address);
@@ -279,8 +264,6 @@ interface IERC20Like{
 
     function burnHabibizForRoyals(address user,uint256[] calldata _tokenIds) external returns (bool);
 }
-
-
 
 
 

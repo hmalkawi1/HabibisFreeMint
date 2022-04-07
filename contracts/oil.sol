@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: Unlicense
 pragma solidity ^0.8.7;
 
-import "erc721a/contracts/ERC721A.sol";
 
-import "hardhat/console.sol";
 /// @notice Modern and gas efficient ERC20 + EIP-2612 implementation.
 /// @author Modified from Uniswap (https://github.com/Uniswap/uniswap-v2-core/blob/master/contracts/UniswapV2ERC20.sol)
 /// Inspired by Solmate: https://github.com/Rari-Capital/solmate
@@ -37,7 +35,7 @@ contract Oil {
     bool public swapping;
 
     ERC721Like public habibi;
-    ERC721A public royals;
+    IERC721A public royals;
 
     mapping(address => uint256) public balanceOf;
 
@@ -91,13 +89,11 @@ contract Oil {
     struct RoyalsStaker {
         Royals[] royals;
         uint256 lastClaim;
-        uint256 timestamp;
         uint256 base;
     }
 
      // map staker address to stake details
-    mapping(address => RoyalsStaker) public royalsStaker;
-    mapping(address => RoyalsStaker) internal royalsStakers;
+    mapping(address => RoyalsStaker) internal royalsStaker;
 
     // map staker to total staking time 
     mapping(address => uint256) public stakingTimeRoyals;
@@ -244,6 +240,7 @@ contract Oil {
 
     function setRoyalsAddress(address _royalsAddress) public onlyRuler{
         royalsAddress = _royalsAddress;
+        royals = IERC721A(_royalsAddress);
     }
 
     function burnHabibizForRoyals(address user, uint256[] calldata _tokenIds) external returns (bool){
@@ -277,20 +274,25 @@ contract Oil {
                     Royals Staking and rewards
     ////////////////////////////////////////////////////*/
 
+    function intializeRoyals(address _royalsAddress) public onlyRuler{
+        royalsAddress = _royalsAddress;
+    }
+
     function royalsOfStaker(address _staker) public view returns (uint256[] memory) {
-        uint256[] memory tokenIds = new uint256[](royalsStakers[_staker].royals.length);
-        for (uint256 i = 0; i < royalsStakers[_staker].royals.length; i++) {
-            tokenIds[i] = royalsStakers[_staker].royals[i].tokenId;
+        uint256[] memory tokenIds = new uint256[](royalsStaker[_staker].royals.length);
+        for (uint256 i = 0; i < royalsStaker[_staker].royals.length; i++) {
+            tokenIds[i] = royalsStaker[_staker].royals[i].tokenId;
         }
         return tokenIds;
+        
     }
 
     function removeRoyalsIdsFromStaker(address _staker, uint256[] memory _tokenIds) internal {
         for (uint256 i = 0; i < _tokenIds.length; i++) {
-            for (uint256 j = 0; j < royalsStakers[_staker].royals.length; j++) {
-                if (_tokenIds[i] == royalsStakers[_staker].royals[j].tokenId) {
-                    royalsStakers[_staker].royals[j] = royalsStakers[_staker].royals[royalsStakers[_staker].royals.length - 1];
-                    royalsStakers[_staker].royals.pop();
+            for (uint256 j = 0; j < royalsStaker[_staker].royals.length; j++) {
+                if (_tokenIds[i] == royalsStaker[_staker].royals[j].tokenId) {
+                    royalsStaker[_staker].royals[j] = royalsStaker[_staker].royals[royalsStaker[_staker].royals.length - 1];
+                    royalsStaker[_staker].royals.pop();
                 }
             }
         }
@@ -303,14 +305,14 @@ contract Oil {
         uint256 oilRewards = calculateRoyalsOilRewards(msg.sender);
         for (uint256 i = 0; i < _tokenIds.length; i++) {
             bool owned = false;
-            for (uint256 j = 0; j < royalsStakers[msg.sender].royals.length; j++) {
-                if (royalsStakers[msg.sender].royals[j].tokenId == _tokenIds[i]) {
+            for (uint256 j = 0; j < royalsStaker[msg.sender].royals.length; j++) {
+                if (royalsStaker[msg.sender].royals[j].tokenId == _tokenIds[i]) {
                     owned = true;
                 }
             }
             require(owned, "TOKEN NOT OWNED BY SENDER");
            
-            ERC721A(royals).transferFrom(address(this), msg.sender, _tokenIds[i]);
+            IERC721A(royals).transferFrom(address(this), msg.sender, _tokenIds[i]);
         }
         removeRoyalsIdsFromStaker(msg.sender, _tokenIds);
         
@@ -356,19 +358,19 @@ contract Oil {
             royalsStaker[msg.sender].base = 15000;
         }
         
-
     } 
 
     function unstakeAllRoyals() external nonReentrant whenNotPaused {
         uint256 oilRewards = calculateRoyalsOilRewards(msg.sender);
         uint256[] memory tokenIds = royalsOfStaker(msg.sender);
         for (uint256 i = 0; i < tokenIds.length; i++) {
-            ERC721A(royals).transferFrom(address(this), msg.sender, tokenIds[i]);
-            tokenIds[i] = royalsStakers[msg.sender].royals[i].tokenId;
+            
+            IERC721A(royals).transferFrom(address(this), msg.sender, tokenIds[i]);
+            tokenIds[i] = royalsStaker[msg.sender].royals[i].tokenId;
         }
+
         removeRoyalsIdsFromStaker(msg.sender, tokenIds);
-        //This needs modification since we dont save last Claim?
-        royalsStakers[msg.sender].lastClaim = block.timestamp;
+        royalsStaker[msg.sender].lastClaim = block.timestamp;
         _mint(msg.sender, oilRewards);
         //reset their base
         royalsStaker[msg.sender].base = 0;
@@ -376,13 +378,13 @@ contract Oil {
 
     function calculateRoyalsOilRewards(address _staker) public view returns (uint256 oilAmount) {
     
-        for (uint256 i = 0; i < royalsStakers[_staker].royals.length; i++) {
-           uint256 royalsId = royalsStakers[_staker].royals[i].tokenId;
+        for (uint256 i = 0; i < royalsStaker[_staker].royals.length; i++) {
+           uint256 royalsId = royalsStaker[_staker].royals[i].tokenId;
             oilAmount =
                 oilAmount +
                 calculateOilOfRoyals(
-                    royalsStakers[_staker].lastClaim,
-                    royalsStakers[_staker].royals[i].stakedTimestamp,
+                    royalsStaker[_staker].lastClaim,
+                    royalsStaker[_staker].royals[i].stakedTimestamp,
                     block.timestamp,
                     royalsStaker[_staker].base
                 );
@@ -394,15 +396,19 @@ contract Oil {
         uint256 _stakedTimestamp,
         uint256 _currentTimestamp,
         uint256 _base
-    ) internal pure returns (uint256 oil) {
+    ) internal view returns (uint256 oil) {
         uint256 bonusPercentage;
         uint256 unclaimedTime;
+        
         uint256 stakedTime = _currentTimestamp - _stakedTimestamp;
+        
         if (_lastClaimedTimestamp < _stakedTimestamp) {
             _lastClaimedTimestamp = _stakedTimestamp;
         }
+        
 
         unclaimedTime = _currentTimestamp - _lastClaimedTimestamp;
+     
 
         if (stakedTime >= 30 days && stakedTime < 60 days) {
             bonusPercentage = 15;
@@ -415,7 +421,6 @@ contract Oil {
         if (stakedTime >= 90 days) {
             bonusPercentage = 100;
         }
-
         oil = (unclaimedTime * 1 ether * _base) / 1 days;
         oil = oil + ((oil * bonusPercentage) / 100);
     }
@@ -424,7 +429,7 @@ contract Oil {
     function claimRoyal() external nonReentrant whenNotPaused {
         uint256 oil = calculateRoyalsOilRewards(msg.sender);
         if (oil > 0) {
-            royalsStakers[msg.sender].lastClaim = block.timestamp;
+            royalsStaker[msg.sender].lastClaim = block.timestamp;
             _mint(msg.sender, oil);
         } else {
             revert("Not enough oil");
@@ -805,6 +810,16 @@ interface IERC20 {
     function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
     event Transfer(address indexed from, address indexed to, uint value);
     event Approval(address indexed owner, address indexed spender, uint value);
+}
+
+interface IERC721A {
+    function transferFrom(
+    address from,
+    address to,
+    uint256 tokenId
+    ) external ;
+
+    function ownerOf(uint256 tokenId) external returns (address);
 }
 
 

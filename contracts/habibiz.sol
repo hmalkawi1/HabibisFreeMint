@@ -1301,8 +1301,8 @@ contract Habibi is ERC721Enumerable, Ownable {
   string public notRevealedUri;
   uint256 public cost = 0.049 ether;
   uint256 public maxSupply = 4900;
-  uint256 public maxMintAmount = 1;
-  uint256 public nftPerAddressLimit = 100;
+  uint256 public maxMintAmount = 100;
+  uint256 public nftPerAddressLimit = 1000;
   bool public paused = false;
   bool public revealed = false;
   mapping(address => uint256) public addressMintedBalance;
