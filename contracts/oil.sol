@@ -385,7 +385,7 @@ contract Oil {
     }
 
 
-        function calculateOilOfStaker(
+    function calculateOilOfStaker(
         uint256 _habibiId,
         uint256 _lastClaimedTimestamp,
         uint256 _stakedTimestamp,
