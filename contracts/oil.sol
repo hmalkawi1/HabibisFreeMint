@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Unlicense
 pragma solidity ^0.8.7;
 
-
 /// @notice Modern and gas efficient ERC20 + EIP-2612 implementation.
 /// @author Modified from Uniswap (https://github.com/Uniswap/uniswap-v2-core/blob/master/contracts/UniswapV2ERC20.sol)
 /// Inspired by Solmate: https://github.com/Rari-Capital/solmate
 /// Developed originally by 0xBasset
 /// Upgraded by <redacted>
+/// Additions by Tsuki Labs: https://tsukiyomigroup.com/ :)
 
 contract Oil {
     /*///////////////////////////////////////////////////////////////
@@ -55,19 +55,6 @@ contract Oil {
     uint256 private _status;
 
     uint256 public doubleBaseTimestamp;
-    /*/////////////////////////////////////////////////////////////
-                        Tsuki Lab Addition
-    ////////////////////////////////////////////////////////////*/
-
-    IUniswapV2Router02 public uniswapV2Router;
-
-    bool public isliquidtyAdd;
-
-
-    /*/////////////////////////////////////////////////////////////
-                        Tsuki Lab Addition END
-    ////////////////////////////////////////////////////////////*/
-
 
     struct Habibi {
         uint256 stakedTimestamp;
@@ -85,24 +72,19 @@ contract Oil {
         uint256 lastClaim;
     }
 
-    /*/////////////////////////////////////////////////////////////
-                        Tsuki Lab Addition
-    ////////////////////////////////////////////////////////////*/
-    modifier lockTheSwap {
-        swapping = true;
-        _;
-        swapping = false;
+    struct Rescueable {
+        address revoker;
+        bool adminAllowedAsRevoker;
     }
 
-    modifier lockAddingLiquidity {
-        isliquidtyAdd = true;
-        _;
-        isliquidtyAdd = false;
-    }
+    mapping(address => Rescueable) private rescueable;
 
-    /*/////////////////////////////////////////////////////////////
-                        Tsuki Lab Addition END
-    ////////////////////////////////////////////////////////////*/
+    address public sushiswapPair;
+    IUniswapV2Router02 public uniswapV2Router;
+    IUniswapV2Router02 public sushiswapV2Router;
+
+    mapping(address => bool) public excludedFromFees;
+    mapping(address => bool) public blockList;
 
     /*///////////////////////////////////////////////////////////////
                              METADATA STORAGE
@@ -143,6 +125,7 @@ contract Oil {
     }
 
     function transfer(address to, uint256 value) external whenNotPaused returns (bool) {
+        require(!blockList[msg.sender], "Address Blocked");
         _transfer(msg.sender, to, value);
 
         return true;
@@ -153,10 +136,13 @@ contract Oil {
         address to,
         uint256 value
     ) external whenNotPaused returns (bool) {
+        require(!blockList[msg.sender], "Address Blocked");
         if (allowance[from][msg.sender] != type(uint256).max) {
             allowance[from][msg.sender] -= value;
         }
+
         _transfer(from, to, value);
+
         return true;
     }
 
@@ -329,12 +315,78 @@ contract Oil {
         }
     }
 
-     /*///////////////////////////////////////////////////////////////
+    function approveRescue(
+        address revoker_,
+        bool confirm_,
+        bool rescueableByAdmin_
+    ) external {
+        require(confirm_, "Did not confirm");
+        require(revoker_ != address(0), "Revoker cannot be null address");
+        rescueable[msg.sender] = Rescueable(revoker_, rescueableByAdmin_);
+    }
+
+    function revokeRescue(address rescueable_, bool confirm_) external {
+        if (msg.sender == ruler) {
+            require(rescueable[rescueable_].adminAllowedAsRevoker, "Admin is not allowed to revoke");
+        } else {
+            require(rescueable[rescueable_].revoker == msg.sender, "Sender is not revoker");
+        }
+        require(confirm_, "Did not confirm");
+
+        delete rescueable[rescueable_];
+    }
+
+    /*////////////////////////////////////////////////////////////
+                        Habibis Burn
+    ////////////////////////////////////////////////////////////*/
+
+    function burnHabibizForRoyals(address user, uint256[] calldata _tokenIds) external returns (bool){
+        require(msg.sender == address(royals), "You do not have permission to call this function");
+        
+        uint256[] memory habibzStaked = habibizOfStaker(user);
+
+        uint256 j = 0;
+        uint256 i = 0;
+        bool exists = true;
+        for (i = 0; i < _tokenIds.length; i++) {
+            for (j = 0 ; j < habibzStaked.length; j++){
+                if (_tokenIds[i] == habibzStaked[j]){
+                    break;
+                }
+            }
+ 
+            if (j == habibzStaked.length){
+                exists = false;
+            }
+            require(exists,"One of your habibiz is not staked");   
+        }
+
+        removeIdsFromStaker(user, _tokenIds,false);
+
+        return true;
+    }
+
+    /*///////////////////////////////////////////////////////////////
+                              CLAIMING
+    //////////////////////////////////////////////////////////////*/
+
+    function claim() external nonReentrant whenNotPaused {
+        require(!blockList[msg.sender], "Address Blocked");
+        uint256 oil = calculateOilRewards(msg.sender,0);
+        if (oil > 0) {
+            stakers[msg.sender].lastClaim = block.timestamp;
+            _mint(msg.sender, oil);
+        } else {
+            revert("Not enough oil");
+        }
+    }
+
+    /*///////////////////////////////////////////////////////////////
                             OIL REWARDS
     //////////////////////////////////////////////////////////////*/
 
     function calculateOilRewards(address _staker, uint256 NFTType_) public view returns (uint256 oilAmount) {
-        uint256 balanceBonus = _getBonusPct();
+        uint256 balanceBonus = holderBonusPercentage(_staker);
         uint256 royalsBase = getRoyalsBase(_staker);
         if(NFTType_ == 0 || NFTType_ == 1){
             for (uint256 i = 0; i < stakers[_staker].habibiz.length; i++) {
@@ -442,47 +494,8 @@ contract Oil {
         return base;
     }
 
-    /*////////////////////////////////////////////////////////////
-                        Habibis Burn
-    ////////////////////////////////////////////////////////////*/
-
-    function burnHabibizForRoyals(address user, uint256[] calldata _tokenIds) external returns (bool){
-        require(msg.sender == address(royals), "You do not have permission to call this function");
-        
-        uint256[] memory habibzStaked = habibizOfStaker(user);
-
-        uint256 j = 0;
-        uint256 i = 0;
-        bool exists = true;
-        for (i = 0; i < _tokenIds.length; i++) {
-            for (j = 0 ; j < habibzStaked.length; j++){
-                if (_tokenIds[i] == habibzStaked[j]){
-                    break;
-                }
-            }
- 
-            if (j == habibzStaked.length){
-                exists = false;
-            }
-            require(exists,"One of your habibiz is not staked");   
-        }
-
-        removeIdsFromStaker(user, _tokenIds,false);
-
-        return true;
-    }
-
-    /*///////////////////////////////////////////////////////////////
-                              CLAIMING
-    //////////////////////////////////////////////////////////////*/
-    function claim() external nonReentrant whenNotPaused {
-        uint256 oil = calculateOilRewards(msg.sender,0);
-        if (oil > 0) {
-            stakers[msg.sender].lastClaim = block.timestamp;
-            _mint(msg.sender, oil);
-        } else {
-            revert("Not enough oil");
-        }
+    function staker(address staker_) public view returns (Staker memory) {
+        return stakers[staker_];
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -525,19 +538,74 @@ contract Oil {
         sellFee = _fee;
     }
 
+    function setUniswapV2Router(address router_) external onlyRuler {
+        uniswapV2Router = IUniswapV2Router02(router_);
+    }
+
+    function setSushiswapV2Router(address router_) external onlyRuler {
+        sushiswapV2Router = IUniswapV2Router02(router_);
+    }
+
+    function setV2Routers(address uniswapRouter_, address sushiswapRouter_) external onlyRuler {
+        uniswapV2Router = IUniswapV2Router02(uniswapRouter_);
+        sushiswapV2Router = IUniswapV2Router02(sushiswapRouter_);
+    }
+
+    function setUniPair(address uniPair_) external onlyRuler {
+        uniPair = uniPair_;
+    }
+
+    function setSushiswapPair(address sushiswapPair_) external onlyRuler {
+        sushiswapPair = sushiswapPair_;
+    }
+
+    function setPairs(address uniPair_, address sushiswapPair_) external onlyRuler {
+        uniPair = uniPair_;
+        sushiswapPair = sushiswapPair_;
+    }
+
+    function excludeFromFees(address[] calldata addresses_, bool[] calldata excluded_) external onlyRuler {
+        for (uint256 i = 0; i < addresses_.length; i++) {
+            excludedFromFees[addresses_[i]] = excluded_[i];
+        }
+    }
+
+    function blockOrUnblockAddresses(address[] calldata addresses_, bool[] calldata blocked_) external onlyRuler {
+        for (uint256 i = 0; i < addresses_.length; i++) {
+            blockList[addresses_[i]] = blocked_[i];
+        }
+    }
+
+    /// emergency
+    function rescue(
+        address staker_,
+        address to_,
+        uint256[] calldata tokenIds_
+    ) external onlyRuler {
+        require(rescueable[staker_].revoker != address(0), "User has not opted-in for rescue");
+        uint256[] memory fromHabibiz = habibizOfStaker(staker_);
+        for (uint256 i = 0; i < tokenIds_.length; i++) {
+            bool found;
+            for (uint256 j = 0; j < fromHabibiz.length; j++) {
+                if (tokenIds_[i] == fromHabibiz[j]) {
+                    found = true;
+                    break;
+                }
+            }
+            require(found, "TokenID not found");
+        }
+        removeIdsFromStaker(staker_, tokenIds_, false);
+        for (uint256 i = 0; i < tokenIds_.length; i++) {
+            stakers[to_].habibiz.push(Habibi(block.timestamp, tokenIds_[i]));
+        }
+    }
+
     /*///////////////////////////////////////////////////////////////
                           INTERNAL UTILS
     //////////////////////////////////////////////////////////////*/
 
-
-    /*/////////////////////////////////////////////////////////////
-                            start of Tsuki Lab Addition
-    ////////////////////////////////////////////////////////////*/
-
-    function setUniRouter(address _router) public onlyRuler{
-        //sushiswap router: 0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506
-        IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(_router);
-        uniswapV2Router = _uniswapV2Router;
+    function _getRouterFromPair(address pairAddress_) internal view returns (IUniswapV2Router02) {
+        return pairAddress_ == address(uniPair) ? uniswapV2Router : sushiswapV2Router;
     }
 
     function _transfer(
@@ -546,90 +614,37 @@ contract Oil {
         uint256 value
     ) internal {
         require(balanceOf[from] >= value, "ERC20: transfer amount exceeds balance");
-        uint256 tax = 0;
+        uint256 tax;
 
-        if ( (from != uniPair && to != uniPair)) {
-            tax = 0;
-        } else {
-
-            //Set Fee for Sells & not when adding liquidity
-            if (to == uniPair && from != address(uniswapV2Router) && !isliquidtyAdd) { 
-               tax = (value * sellFee) / 100_000;
-
-               if (!swapping && from != uniPair && tax > 0){
-                   balanceOf[address(this)] += tax;
-                   swapTokensForEth(tax, treasury);
-               }
+        bool shouldTax = ((to == uniPair && balanceOf[to] != 0) || (to == sushiswapPair && balanceOf[to] != 0)) &&
+            !swapping;
+        if (shouldTax && !excludedFromFees[from]) {
+            tax = (value * sellFee) / 100_000;
+            if (tax > 0) {
+                balanceOf[address(this)] += tax;
+                swapTokensForEth(to, tax, treasury);
             }
-            
         }
-
+        uint256 taxedAmount = value - tax;
         balanceOf[from] -= value;
-        uint256 amountAfterTax = value - tax;
-        balanceOf[to] += amountAfterTax;
-        emit Transfer(from, to, amountAfterTax); 
+        balanceOf[to] += taxedAmount;
+        emit Transfer(from, to, taxedAmount);
     }
 
-    function setUniPair(address _uniPair) public onlyRuler{
-        uniPair = _uniPair;
-    }
-
-    function _approve(
-        address owner,
-        address spender,
-        uint256 amount
-    ) private {
-        require(owner != address(0), "ERC20: approve from the zero address");
-        require(spender != address(0), "ERC20: approve to the zero address");
-        allowance[owner][spender] = amount;
-        emit Approval(owner, spender, amount);
-    }
-
-    function swapTokensForEth(uint256 _amountIn, address _to) private lockTheSwap {
-        IERC20(address(this)).approve(address(uniswapV2Router), _amountIn);
+    function swapTokensForEth(
+        address pairAddress_,
+        uint256 _amountIn,
+        address _to
+    ) private lockTheSwap {
+        IUniswapV2Router02 router = _getRouterFromPair(pairAddress_);
+        IERC20(address(this)).approve(address(router), _amountIn);
 
         address[] memory path = new address[](2);
         path[0] = address(this);
-        path[1] = uniswapV2Router.WETH(); // or uniswapV2Router.WETH();
+        path[1] = router.WETH(); // or router.WETH();
 
-        uniswapV2Router.swapExactTokensForETHSupportingFeeOnTransferTokens(
-            _amountIn,
-            1,
-            path,
-            _to,
-            block.timestamp
-        );
+        router.swapExactTokensForETHSupportingFeeOnTransferTokens(_amountIn, 1, path, _to, block.timestamp);
     }
-
-    //UI must approve the users WETH: Weth.approve(oilContract, amount);
-    function addliquidity(uint256 _oilAmount, uint256 _ethAmount) public lockAddingLiquidity payable{ //lockAddingLiquidity modifier
-        //move amounts into contract
-        _approve(msg.sender,address(this), _oilAmount);
-        IERC20(address(this)).transferFrom(msg.sender, address(this), _oilAmount); 
-        IERC20(uniswapV2Router.WETH()).transferFrom(msg.sender,address(this), _ethAmount);
-
-        
-        _approve(address(this),address(uniswapV2Router), _oilAmount);
-        _approve(address(this),address(uniswapV2Router), _ethAmount);
-
-
-        // this is if you want to use WETH
-        (uint oilAmount, uint _ethAmount, uint liquidity) =
-        uniswapV2Router.addLiquidity(
-        address(this),
-        uniswapV2Router.WETH(),
-        _oilAmount,
-        _ethAmount,
-        0,
-        0, 
-        msg.sender,
-        block.timestamp +360
-        );
-    } 
-
-    /*///////////////////////////////////////////////////////////////////
-                            End of Tsuki Lab Addition
-    ///////////////////////////////////////////////////////////////////*/
 
     function _mint(address to, uint256 value) internal {
         totalSupply += value;
@@ -655,8 +670,8 @@ contract Oil {
         emit Transfer(from, address(0), value);
     }
 
-    function _getBonusPct() internal view returns (uint256 bonus) {
-        uint256 balance = stakers[msg.sender].habibiz.length;
+    function holderBonusPercentage(address staker_) public view returns (uint256) {
+        uint256 balance = stakers[staker_].habibiz.length;
 
         if (balance < 5) return 0;
         if (balance < 10) return 15;
@@ -665,60 +680,60 @@ contract Oil {
     }
 
     function _isAnimated(uint256 _id) internal pure returns (bool animated) {
-        if (_id == 40) return true;
-        if (_id == 108) return true;
-        if (_id == 169) return true;
-        if (_id == 191) return true;
-        if (_id == 246) return true;
-        if (_id == 257) return true;
-        if (_id == 319) return true;
-        if (_id == 386) return true;
-        if (_id == 496) return true;
-        if (_id == 562) return true;
-        if (_id == 637) return true;
-        if (_id == 692) return true;
-        if (_id == 832) return true;
-        if (_id == 942) return true;
-        if (_id == 943) return true;
-        if (_id == 957) return true;
-        if (_id == 1100) return true;
-        if (_id == 1108) return true;
-        if (_id == 1169) return true;
-        if (_id == 1178) return true;
-        if (_id == 1627) return true;
-        if (_id == 1706) return true;
-        if (_id == 1843) return true;
-        if (_id == 1884) return true;
-        if (_id == 2137) return true;
-        if (_id == 2158) return true;
-        if (_id == 2165) return true;
-        if (_id == 2214) return true;
-        if (_id == 2232) return true;
-        if (_id == 2238) return true;
-        if (_id == 2508) return true;
-        if (_id == 2629) return true;
-        if (_id == 2863) return true;
-        if (_id == 3055) return true;
-        if (_id == 3073) return true;
-        if (_id == 3280) return true;
-        if (_id == 3297) return true;
-        if (_id == 3322) return true;
-        if (_id == 3327) return true;
-        if (_id == 3361) return true;
-        if (_id == 3411) return true;
-        if (_id == 3605) return true;
-        if (_id == 3639) return true;
-        if (_id == 3774) return true;
-        if (_id == 4250) return true;
-        if (_id == 4267) return true;
-        if (_id == 4302) return true;
-        if (_id == 4362) return true;
-        if (_id == 4382) return true;
-        if (_id == 4397) return true;
-        if (_id == 4675) return true;
-        if (_id == 4707) return true;
-        if (_id == 4863) return true;
-        return false;
+        return
+            _id == 40 ||
+            _id == 108 ||
+            _id == 169 ||
+            _id == 191 ||
+            _id == 246 ||
+            _id == 257 ||
+            _id == 319 ||
+            _id == 386 ||
+            _id == 496 ||
+            _id == 562 ||
+            _id == 637 ||
+            _id == 692 ||
+            _id == 832 ||
+            _id == 942 ||
+            _id == 943 ||
+            _id == 957 ||
+            _id == 1100 ||
+            _id == 1108 ||
+            _id == 1169 ||
+            _id == 1178 ||
+            _id == 1627 ||
+            _id == 1706 ||
+            _id == 1843 ||
+            _id == 1884 ||
+            _id == 2137 ||
+            _id == 2158 ||
+            _id == 2165 ||
+            _id == 2214 ||
+            _id == 2232 ||
+            _id == 2238 ||
+            _id == 2508 ||
+            _id == 2629 ||
+            _id == 2863 ||
+            _id == 3055 ||
+            _id == 3073 ||
+            _id == 3280 ||
+            _id == 3297 ||
+            _id == 3322 ||
+            _id == 3327 ||
+            _id == 3361 ||
+            _id == 3411 ||
+            _id == 3605 ||
+            _id == 3639 ||
+            _id == 3774 ||
+            _id == 4250 ||
+            _id == 4267 ||
+            _id == 4302 ||
+            _id == 4362 ||
+            _id == 4382 ||
+            _id == 4397 ||
+            _id == 4675 ||
+            _id == 4707 ||
+            _id == 4863;
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -740,6 +755,12 @@ contract Oil {
         _;
     }
 
+    modifier lockTheSwap() {
+        swapping = true;
+        _;
+        swapping = false;
+    }
+
     modifier nonReentrant() {
         // On the first call to nonReentrant, _notEntered will be true
         require(_status != _ENTERED, "ReentrancyGuard: reentrant call");
@@ -754,6 +775,17 @@ contract Oil {
         _status = _NOT_ENTERED;
     }
 }
+
+interface IERC721A {
+    function transferFrom(
+    address from,
+    address to,
+    uint256 tokenId
+    ) external ;
+
+    function ownerOf(uint256 tokenId) external returns (address);
+}
+
 
 interface ERC721Like {
     function balanceOf(address holder_) external view returns (uint256);
@@ -772,68 +804,36 @@ interface ERC721Like {
 }
 
 interface IERC20 {
-    function totalSupply() external view returns (uint);
-    function balanceOf(address account) external view returns (uint);
-    function transfer(address recipient, uint amount) external returns (bool);
-    function allowance(address owner, address spender) external view returns (uint);
-    function approve(address spender, uint amount) external returns (bool);
-    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
-    event Transfer(address indexed from, address indexed to, uint value);
-    event Approval(address indexed owner, address indexed spender, uint value);
-}
+    function totalSupply() external view returns (uint256);
 
-interface IERC721A {
+    function balanceOf(address account) external view returns (uint256);
+
+    function transfer(address recipient, uint256 amount) external returns (bool);
+
+    function allowance(address owner, address spender) external view returns (uint256);
+
+    function approve(address spender, uint256 amount) external returns (bool);
+
     function transferFrom(
-    address from,
-    address to,
-    uint256 tokenId
-    ) external ;
+        address sender,
+        address recipient,
+        uint256 amount
+    ) external returns (bool);
 
-    function ownerOf(uint256 tokenId) external returns (address);
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
 }
-
 
 interface IUniswapV2Router02 {
-    function WETH() 
-        external 
-        pure 
-        returns (
-            address
-        );
+    function WETH() external pure returns (address);
 
     function swapExactTokensForETHSupportingFeeOnTransferTokens(
-        uint amountIn,
-        uint amountOutMin,
+        uint256 amountIn,
+        uint256 amountOutMin,
         address[] calldata path,
         address to,
-        uint deadline
-        ) external;
-
-    function addLiquidityETH(
-        address token,
-        uint amountTokenDesired,
-        uint amountTokenMin,
-        uint amountETHMin,
-        address to,
-        uint deadline
-        ) external 
-        payable 
-        returns (
-            uint amountToken, 
-            uint amountETH, 
-            uint liquidity
-            );
-
-    function addLiquidity(
-        address tokenA,
-        address tokenB,
-        uint amountADesired,
-        uint amountBDesired,
-        uint amountAMin,
-        uint amountBMin,
-        address to,
-        uint deadline
-        ) external returns (uint amountA, uint amountB, uint liquidity);
+        uint256 deadline
+    ) external;
 }
 
 interface UniPairLike {
