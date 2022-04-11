@@ -365,21 +365,22 @@ contract Oil {
                     );
             }
         }
-        if(NFTType_ == 0 || NFTType_ ==2)
-        for (uint256 i = 0; i < stakers[_staker].royals.length; i++) {
-            uint256 habibiId = stakers[_staker].royals[i].tokenId;
-            oilAmount =
-                oilAmount +
-                calculateOilOfStaker(
-                    habibiId,
-                    stakers[_staker].lastClaim,
-                    stakers[_staker].royals[i].stakedTimestamp,
-                    block.timestamp,
-                    balanceBonus,
-                    doubleBaseTimestamp,
-                    true,
-                    royalsBase
-                );
+        if(NFTType_ == 0 || NFTType_ == 2){
+            for (uint256 i = 0; i < stakers[_staker].royals.length; i++) {
+                uint256 habibiId = stakers[_staker].royals[i].tokenId;
+                oilAmount =
+                    oilAmount +
+                    calculateOilOfStaker(
+                        habibiId,
+                        stakers[_staker].lastClaim,
+                        stakers[_staker].royals[i].stakedTimestamp,
+                        block.timestamp,
+                        balanceBonus,
+                        doubleBaseTimestamp,
+                        true,
+                        royalsBase
+                    );
+            }
         }
     }
 
