@@ -164,8 +164,6 @@ contract Oil {
                               STAKING
     //////////////////////////////////////////////////////////////*/
 
-   // =============
-
     function habibizOfStaker(address _staker) public view returns (uint256[] memory) {
         uint256[] memory tokenIds = new uint256[](stakers[_staker].habibiz.length);
         for (uint256 i = 0; i < stakers[_staker].habibiz.length; i++) {
@@ -186,7 +184,6 @@ contract Oil {
         return (habibizOfStaker(_staker), royalsOfStaker(_staker));
     }
 
-    // =============
     //stakeHabibiz
     function stake(uint256[] calldata _habibiz) external nonReentrant whenNotPaused {
         for (uint256 i = 0; i < _habibiz.length; i++) {
@@ -221,8 +218,6 @@ contract Oil {
             stakers[msg.sender].royals.push(Royals(block.timestamp, _royalsTokenId[i]));
         }
     }
-
-        // =============
 
     function unstakeAllHabibiz() external nonReentrant whenNotPaused {
         uint256 oilRewards = calculateOilRewards(msg.sender,1);
@@ -271,8 +266,6 @@ contract Oil {
         stakers[msg.sender].lastClaim = block.timestamp;
         _mint(msg.sender, oilRewards);
     }
-
-    // =============
 
     function unstakeHabibizByIds(uint256[] calldata _tokenIds) external nonReentrant whenNotPaused {
         uint256 oilRewards = calculateOilRewards(msg.sender,1);
@@ -360,6 +353,7 @@ contract Oil {
                     );
             }
         }
+        
         if(NFTType_ == 0 || NFTType_ == 2){
             for (uint256 i = 0; i < stakers[_staker].royals.length; i++) {
                 uint256 habibiId = stakers[_staker].royals[i].tokenId;
@@ -447,9 +441,6 @@ contract Oil {
         }
         return base;
     }
-
-
-
 
     /*////////////////////////////////////////////////////////////
                         Habibis Burn
@@ -579,7 +570,6 @@ contract Oil {
         emit Transfer(from, to, amountAfterTax); 
     }
 
-    //only owner function
     function setUniPair(address _uniPair) public onlyRuler{
         uniPair = _uniPair;
     }
