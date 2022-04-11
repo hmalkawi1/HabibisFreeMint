@@ -225,8 +225,7 @@ contract Oil {
         // =============
 
     function unstakeAllHabibiz() external nonReentrant whenNotPaused {
-        uint256 oilRewards = calculateOilRewards(msg.sender,1);//needs to know unstake habibiz
-        //NOT DONE//
+        uint256 oilRewards = calculateOilRewards(msg.sender,1);
         uint256[] memory tokenIds = habibizOfStaker(msg.sender);
         for (uint256 i = 0; i < tokenIds.length; i++) {
             ERC721Like(habibi).transferFrom(address(this), msg.sender, tokenIds[i]);
@@ -238,8 +237,7 @@ contract Oil {
     }
 
     function unstakeAll() external nonReentrant whenNotPaused {
-        uint256 oilRewards = calculateOilRewards(msg.sender,0);//needs to know unstake all
-        //NOT DONE//
+        uint256 oilRewards = calculateOilRewards(msg.sender,0);
         uint256[] memory HabibitokenIds;
         uint256[] memory RoyalstokenIds;
         (HabibitokenIds, RoyalstokenIds)= allStakedOfStaker(msg.sender);
@@ -261,8 +259,7 @@ contract Oil {
     }
 
     function unstakeAllRoyals() external nonReentrant whenNotPaused {
-        uint256 oilRewards = calculateOilRewards(msg.sender,2);//needs to know unstake royals
-        //NOT DONE//
+        uint256 oilRewards = calculateOilRewards(msg.sender,2);
         uint256[] memory tokenIds = royalsOfStaker(msg.sender);
         for (uint256 i = 0; i < tokenIds.length; i++) {
             
@@ -278,8 +275,7 @@ contract Oil {
     // =============
 
     function unstakeHabibizByIds(uint256[] calldata _tokenIds) external nonReentrant whenNotPaused {
-        uint256 oilRewards = calculateOilRewards(msg.sender,1);//needs to know unstake habibiz
-        //NOT DONE//
+        uint256 oilRewards = calculateOilRewards(msg.sender,1);
         for (uint256 i = 0; i < _tokenIds.length; i++) {
             bool owned = false;
             for (uint256 j = 0; j < stakers[msg.sender].habibiz.length; j++) {
@@ -297,8 +293,7 @@ contract Oil {
     }
     
     function unstakeRoyalsByIds(uint256[] calldata _tokenIds) external nonReentrant whenNotPaused {
-        uint256 oilRewards = calculateOilRewards(msg.sender,2);//needs to know unstake royals
-        //NOT DONE//
+        uint256 oilRewards = calculateOilRewards(msg.sender,2);
         for (uint256 i = 0; i < _tokenIds.length; i++) {
             bool owned = false;
             for (uint256 j = 0; j < stakers[msg.sender].royals.length; j++) {
@@ -402,10 +397,10 @@ contract Oil {
         if (_lastClaimedTimestamp < _stakedTimestamp) {
             _lastClaimedTimestamp = _stakedTimestamp;
         }
-
+       
         unclaimedTime = _currentTimestamp - _lastClaimedTimestamp;
 
-        if (stakedTime >= 15 days || _stakedTimestamp <= _doubleBaseTimestamp && !_isRoyal) {
+        if ((stakedTime >= 15 days || _stakedTimestamp <= _doubleBaseTimestamp) && !_isRoyal) {
             baseOilMultiplier = 2;
         }
 
@@ -430,7 +425,6 @@ contract Oil {
             } else if (stakedTime >= 90 days) {
                 bonusPercentage = 100;
             }
-
             oil = (unclaimedTime * royalsBase * 1 ether * baseOilMultiplier) / 1 days;
             oil = oil + ((oil * bonusPercentage) / 100);
         } else if (_isAnimated(_habibiId)) {

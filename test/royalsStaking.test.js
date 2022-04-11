@@ -19,15 +19,14 @@ describe("Royals", function () {
 
         await habibz.setApprovalForAll(oil.address, true);
         await habibz.isApprovedForAll(deployer.address, oil.address);
-        await oil.initialize(habibz.address, "0x0000000000000000000000000000000000000000");
         const Royals = await hre.ethers.getContractFactory("Royals");
         royals = await Royals.deploy(habibz.address, oil.address, "", "", 3);
         await royals.deployed();
+        await oil.initialize(habibz.address, royals.address, "0x0000000000000000000000000000000000000000");
     });
 
     describe("royals Of Staker", function () {
-        it("walletOfOwner test", async function(){
-            oil.setRoyalsAddress(royals.address);
+        it("walletOfOwner test", async function () {
             await royals.setSaleState(2);
             await royals.setBatchSize(10);
             await royals.setMaxMintPerWallet(4);
@@ -38,48 +37,31 @@ describe("Royals", function () {
             }
             await oil.stake(habibzToBeBurned);
             await royals.mint(habibzToBeBurned, []);
-            
+
             expect((await royals.walletOfOwner(deployer.address)).length).to.equal(2);
-            
-            
-           
-            const RoycontractFromUser = await hre.ethers.getContractAt(
-                "Royals",
-                royals.address,
-                user1
-            );
-            const HabcontractFromUser = await hre.ethers.getContractAt(
-                "Habibi",
-                habibz.address,
-                user1
-            );
-            const OilcontractFromUser = await hre.ethers.getContractAt(
-                "Oil",
-                oil.address,
-                user1
-            );
+
+            const RoycontractFromUser = await hre.ethers.getContractAt("Royals", royals.address, user1);
+            const HabcontractFromUser = await hre.ethers.getContractAt("Habibi", habibz.address, user1);
+            const OilcontractFromUser = await hre.ethers.getContractAt("Oil", oil.address, user1);
             await HabcontractFromUser.mint(3);
 
-         
             await royals.setAmountRequiredToBurn(1);
             let habibzToBeBurned3 = [];
             for (i = 0; i < 3; i++) {
                 habibzToBeBurned3.push(await HabcontractFromUser.tokenOfOwnerByIndex(user1.address, i));
             }
-            HabcontractFromUser.setApprovalForAll(oil.address,true);
+            HabcontractFromUser.setApprovalForAll(oil.address, true);
             await OilcontractFromUser.stake(habibzToBeBurned3);
             await RoycontractFromUser.mint(habibzToBeBurned3, []);
             expect((await royals.walletOfOwner(user1.address)).length).to.equal(3);
-
-        })
-        it("should return length 0 if none is staked", async function(){
+        });
+        it("should return length 0 if none is staked", async function () {
             let arr = [];
             arr = await oil.royalsOfStaker(deployer.address);
             expect(arr.length).to.eq(0);
-        })
+        });
 
-        it("should stake and remove Royal from users wallet + should show owned by OIL", async function(){
-            oil.setRoyalsAddress(royals.address);
+        it("should stake and remove Royal from users wallet + should show owned by OIL", async function () {
             await royals.setSaleState(2);
             await royals.setBatchSize(10);
             await royals.setMaxMintPerWallet(4);
@@ -90,7 +72,7 @@ describe("Royals", function () {
             }
             await oil.stake(habibzToBeBurned);
             await royals.mint(habibzToBeBurned, []);
-            
+
             expect(await royals.balanceOf(deployer.address)).to.equal(1);
 
             await royals.approve(oil.address, 1);
@@ -99,9 +81,7 @@ describe("Royals", function () {
             expect((await royals.walletOfOwner(oil.address)).length).to.eq(1);
         });
 
-        
-        it.only("should unstake Royal from Oil by ID", async function(){
-            oil.setRoyalsAddress(royals.address);
+        it("should unstake Royal from Oil by ID", async function () {
             await royals.setSaleState(2);
             await royals.setBatchSize(10);
             await royals.setMaxMintPerWallet(4);
@@ -113,51 +93,34 @@ describe("Royals", function () {
             await oil.stake(habibzToBeBurned);
             await royals.mint(habibzToBeBurned, []);
 
-            let compare = []
+            let compare = [];
             compare = await royals.walletOfOwner(deployer.address);
             await royals.approve(oil.address, 1);
             await oil.stakeRoyals(await royals.walletOfOwner(deployer.address));
 
-     
             expect((await royals.walletOfOwner(oil.address)).length).to.eq(1);
-            
-            expect ((await oil.royalsOfStaker(deployer.address)).length).to.equal(1);
-           
+
+            expect((await oil.royalsOfStaker(deployer.address)).length).to.equal(1);
 
             await oil.unstakeRoyalsByIds([1]);
             expect((await oil.royalsOfStaker(deployer.address)).length).to.equal(0);
-            
         });
 
-        it("should unstakeAll", async function(){
-            oil.setRoyalsAddress(royals.address);
+        it("should unstakeAll", async function () {
             await royals.setSaleState(2);
             await royals.setBatchSize(10);
             await royals.setMaxMintPerWallet(4);
 
-
-            const RoycontractFromUser = await hre.ethers.getContractAt(
-                "Royals",
-                royals.address,
-                user1
-            );
-            const HabcontractFromUser = await hre.ethers.getContractAt(
-                "Habibi",
-                habibz.address,
-                user1
-            );
-            const OilcontractFromUser = await hre.ethers.getContractAt(
-                "Oil",
-                oil.address,
-                user1
-            );
+            const RoycontractFromUser = await hre.ethers.getContractAt("Royals", royals.address, user1);
+            const HabcontractFromUser = await hre.ethers.getContractAt("Habibi", habibz.address, user1);
+            const OilcontractFromUser = await hre.ethers.getContractAt("Oil", oil.address, user1);
 
             await HabcontractFromUser.mint(3);
             let habibzToBeBurned = [];
             for (i = 0; i < 3; i++) {
                 habibzToBeBurned.push(await HabcontractFromUser.tokenOfOwnerByIndex(user1.address, i));
             }
-            HabcontractFromUser.setApprovalForAll(oil.address,true)
+            HabcontractFromUser.setApprovalForAll(oil.address, true);
             await royals.setAmountRequiredToBurn(1);
             await OilcontractFromUser.stake(habibzToBeBurned);
             await RoycontractFromUser.mint(habibzToBeBurned, []);
@@ -172,43 +135,26 @@ describe("Royals", function () {
             expect((await OilcontractFromUser.royalsOfStaker(user1.address)).length).to.be.equal(0);
             //console.log(await RoycontractFromUser.walletOfOwner(user1.address));
             //expect(await RoycontractFromUser.walletOfOwner(user1.address)).to.be.equal(test);
-            
         });
-        
-        it("Should calculate rewards correctly for 0% bonus for 3 staked", async function(){
-            oil.setRoyalsAddress(royals.address);
+
+        it("Should calculate rewards correctly for 0% bonus for 3 staked", async function () {
             await royals.setSaleState(2);
             await royals.setBatchSize(10);
             await royals.setMaxMintPerWallet(4);
 
-
-            const RoycontractFromUser = await hre.ethers.getContractAt(
-                "Royals",
-                royals.address,
-                user1
-            );
-            const HabcontractFromUser = await hre.ethers.getContractAt(
-                "Habibi",
-                habibz.address,
-                user1
-            );
-            const OilcontractFromUser = await hre.ethers.getContractAt(
-                "Oil",
-                oil.address,
-                user1
-            );
+            const RoycontractFromUser = await hre.ethers.getContractAt("Royals", royals.address, user1);
+            const HabcontractFromUser = await hre.ethers.getContractAt("Habibi", habibz.address, user1);
+            const OilcontractFromUser = await hre.ethers.getContractAt("Oil", oil.address, user1);
 
             await HabcontractFromUser.mint(3);
             let habibzToBeBurned = [];
             for (i = 0; i < 3; i++) {
                 habibzToBeBurned.push(await HabcontractFromUser.tokenOfOwnerByIndex(user1.address, i));
             }
-            HabcontractFromUser.setApprovalForAll(oil.address,true)
+            HabcontractFromUser.setApprovalForAll(oil.address, true);
             await royals.setAmountRequiredToBurn(1);
             await OilcontractFromUser.stake(habibzToBeBurned);
             await RoycontractFromUser.mint(habibzToBeBurned, []);
-
-            
 
             let balance = await OilcontractFromUser.balanceOf(user1.address);
             console.log("Oil Balance before unstaking: %s", ethers.utils.formatEther(balance));
@@ -220,54 +166,35 @@ describe("Royals", function () {
             const blockNumBefore = await ethers.provider.getBlockNumber();
             const blockBefore = await ethers.provider.getBlock(blockNumBefore);
             const timestampBefore = blockBefore.timestamp;
-            await ethers.provider.send('evm_increaseTime', [sevenDays]);
-            await ethers.provider.send('evm_mine');
+            await ethers.provider.send("evm_increaseTime", [sevenDays]);
+            await ethers.provider.send("evm_mine");
             const blockNumAfter = await ethers.provider.getBlockNumber();
             const blockAfter = await ethers.provider.getBlock(blockNumAfter);
             const timestampAfter = blockAfter.timestamp;
             expect(blockNumAfter).to.be.equal(blockNumBefore + 1);
             expect(timestampAfter).to.be.equal(timestampBefore + sevenDays);
-            //============================================================//
-            console.log(ethers.utils.formatEther(await OilcontractFromUser.calculateRoyalsOilRewards(user1.address)));
-            lessThan30 = 315000.0
-            expect(ethers.utils.formatEther(await OilcontractFromUser.calculateRoyalsOilRewards(user1.address))).to.eq(lessThan30.toFixed(1));
-           
-        })
+            lessThan30 = 315000.0;
+            expect(ethers.utils.formatEther(await OilcontractFromUser.calculateOilRewards(user1.address, 2))).to.eq(lessThan30.toFixed(1));
+        });
 
-        it("Should calculate rewards correctly for 15% bonus for 3 staked", async function(){
-            oil.setRoyalsAddress(royals.address);
+        it("Should calculate rewards correctly for 15% bonus for 3 staked", async function () {
             await royals.setSaleState(2);
             await royals.setBatchSize(10);
             await royals.setMaxMintPerWallet(4);
 
-
-            const RoycontractFromUser = await hre.ethers.getContractAt(
-                "Royals",
-                royals.address,
-                user1
-            );
-            const HabcontractFromUser = await hre.ethers.getContractAt(
-                "Habibi",
-                habibz.address,
-                user1
-            );
-            const OilcontractFromUser = await hre.ethers.getContractAt(
-                "Oil",
-                oil.address,
-                user1
-            );
+            const RoycontractFromUser = await hre.ethers.getContractAt("Royals", royals.address, user1);
+            const HabcontractFromUser = await hre.ethers.getContractAt("Habibi", habibz.address, user1);
+            const OilcontractFromUser = await hre.ethers.getContractAt("Oil", oil.address, user1);
 
             await HabcontractFromUser.mint(3);
             let habibzToBeBurned = [];
             for (i = 0; i < 3; i++) {
                 habibzToBeBurned.push(await HabcontractFromUser.tokenOfOwnerByIndex(user1.address, i));
             }
-            HabcontractFromUser.setApprovalForAll(oil.address,true)
+            HabcontractFromUser.setApprovalForAll(oil.address, true);
             await royals.setAmountRequiredToBurn(1);
             await OilcontractFromUser.stake(habibzToBeBurned);
             await RoycontractFromUser.mint(habibzToBeBurned, []);
-
-            
 
             let balance = await OilcontractFromUser.balanceOf(user1.address);
             console.log("Oil Balance before unstaking: %s", ethers.utils.formatEther(balance));
@@ -279,53 +206,37 @@ describe("Royals", function () {
             const blockNumBefore = await ethers.provider.getBlockNumber();
             const blockBefore = await ethers.provider.getBlock(blockNumBefore);
             const timestampBefore = blockBefore.timestamp;
-            await ethers.provider.send('evm_increaseTime', [oneMonth]);
-            await ethers.provider.send('evm_mine');
+            await ethers.provider.send("evm_increaseTime", [oneMonth]);
+            await ethers.provider.send("evm_mine");
             const blockNumAfter = await ethers.provider.getBlockNumber();
             const blockAfter = await ethers.provider.getBlock(blockNumAfter);
             const timestampAfter = blockAfter.timestamp;
             expect(blockNumAfter).to.be.equal(blockNumBefore + 1);
             expect(timestampAfter).to.be.equal(timestampBefore + oneMonth);
-            //============================================================//
-            console.log(ethers.utils.formatEther(await OilcontractFromUser.calculateRoyalsOilRewards(user1.address)));
-            thirty = 1552500.0
-            expect(ethers.utils.formatEther(await OilcontractFromUser.calculateRoyalsOilRewards(user1.address))).to.eq(thirty.toFixed(1));
-           
-        })
+            thirty = 1552500.0;
+            console.log(ethers.utils.formatEther(await OilcontractFromUser.calculateOilRewards(user1.address, 2)));
 
-        it("Should calculate rewards correctly for 30% bonus for 3 staked", async function(){
-            oil.setRoyalsAddress(royals.address);
+            expect(ethers.utils.formatEther(await OilcontractFromUser.calculateOilRewards(user1.address, 2))).to.eq(thirty.toFixed(1));
+        });
+
+        it("Should calculate rewards correctly for 30% bonus for 3 staked", async function () {
             await royals.setSaleState(2);
             await royals.setBatchSize(10);
             await royals.setMaxMintPerWallet(4);
 
-            const RoycontractFromUser = await hre.ethers.getContractAt(
-                "Royals",
-                royals.address,
-                user1
-            );
-            const HabcontractFromUser = await hre.ethers.getContractAt(
-                "Habibi",
-                habibz.address,
-                user1
-            );
-            const OilcontractFromUser = await hre.ethers.getContractAt(
-                "Oil",
-                oil.address,
-                user1
-            );
+            const RoycontractFromUser = await hre.ethers.getContractAt("Royals", royals.address, user1);
+            const HabcontractFromUser = await hre.ethers.getContractAt("Habibi", habibz.address, user1);
+            const OilcontractFromUser = await hre.ethers.getContractAt("Oil", oil.address, user1);
 
             await HabcontractFromUser.mint(3);
             let habibzToBeBurned = [];
             for (i = 0; i < 3; i++) {
                 habibzToBeBurned.push(await HabcontractFromUser.tokenOfOwnerByIndex(user1.address, i));
             }
-            HabcontractFromUser.setApprovalForAll(oil.address,true)
+            HabcontractFromUser.setApprovalForAll(oil.address, true);
             await royals.setAmountRequiredToBurn(1);
             await OilcontractFromUser.stake(habibzToBeBurned);
             await RoycontractFromUser.mint(habibzToBeBurned, []);
-
-            
 
             let balance = await OilcontractFromUser.balanceOf(user1.address);
             console.log("Oil Balance before unstaking: %s", ethers.utils.formatEther(balance));
@@ -337,52 +248,35 @@ describe("Royals", function () {
             const blockNumBefore = await ethers.provider.getBlockNumber();
             const blockBefore = await ethers.provider.getBlock(blockNumBefore);
             const timestampBefore = blockBefore.timestamp;
-            await ethers.provider.send('evm_increaseTime', [twoMonth]);
-            await ethers.provider.send('evm_mine');
+            await ethers.provider.send("evm_increaseTime", [twoMonth]);
+            await ethers.provider.send("evm_mine");
             const blockNumAfter = await ethers.provider.getBlockNumber();
             const blockAfter = await ethers.provider.getBlock(blockNumAfter);
             const timestampAfter = blockAfter.timestamp;
             expect(blockNumAfter).to.be.equal(blockNumBefore + 1);
             expect(timestampAfter).to.be.equal(timestampBefore + twoMonth);
-            //============================================================//
-            console.log(ethers.utils.formatEther(await OilcontractFromUser.calculateRoyalsOilRewards(user1.address)));
-            sixty = 3510000.0
-            expect(ethers.utils.formatEther(await OilcontractFromUser.calculateRoyalsOilRewards(user1.address))).to.eq(sixty.toFixed(1));
-        })
+            sixty = 3510000.0;
+            expect(ethers.utils.formatEther(await OilcontractFromUser.calculateOilRewards(user1.address, 2))).to.eq(sixty.toFixed(1));
+        });
 
-        it("Should calculate rewards correctly for 100% bonus for 3 staked", async function(){
-            oil.setRoyalsAddress(royals.address);
+        it("Should calculate rewards correctly for 100% bonus for 3 staked", async function () {
             await royals.setSaleState(2);
             await royals.setBatchSize(10);
             await royals.setMaxMintPerWallet(4);
 
-            const RoycontractFromUser = await hre.ethers.getContractAt(
-                "Royals",
-                royals.address,
-                user1
-            );
-            const HabcontractFromUser = await hre.ethers.getContractAt(
-                "Habibi",
-                habibz.address,
-                user1
-            );
-            const OilcontractFromUser = await hre.ethers.getContractAt(
-                "Oil",
-                oil.address,
-                user1
-            );
+            const RoycontractFromUser = await hre.ethers.getContractAt("Royals", royals.address, user1);
+            const HabcontractFromUser = await hre.ethers.getContractAt("Habibi", habibz.address, user1);
+            const OilcontractFromUser = await hre.ethers.getContractAt("Oil", oil.address, user1);
 
             await HabcontractFromUser.mint(3);
             let habibzToBeBurned = [];
             for (i = 0; i < 3; i++) {
                 habibzToBeBurned.push(await HabcontractFromUser.tokenOfOwnerByIndex(user1.address, i));
             }
-            HabcontractFromUser.setApprovalForAll(oil.address,true)
+            HabcontractFromUser.setApprovalForAll(oil.address, true);
             await royals.setAmountRequiredToBurn(1);
             await OilcontractFromUser.stake(habibzToBeBurned);
             await RoycontractFromUser.mint(habibzToBeBurned, []);
-
-            
 
             let balance = await OilcontractFromUser.balanceOf(user1.address);
             console.log("Oil Balance before unstaking: %s", ethers.utils.formatEther(balance));
@@ -394,53 +288,35 @@ describe("Royals", function () {
             const blockNumBefore = await ethers.provider.getBlockNumber();
             const blockBefore = await ethers.provider.getBlock(blockNumBefore);
             const timestampBefore = blockBefore.timestamp;
-            await ethers.provider.send('evm_increaseTime', [threeMonths]);
-            await ethers.provider.send('evm_mine');
+            await ethers.provider.send("evm_increaseTime", [threeMonths]);
+            await ethers.provider.send("evm_mine");
             const blockNumAfter = await ethers.provider.getBlockNumber();
             const blockAfter = await ethers.provider.getBlock(blockNumAfter);
             const timestampAfter = blockAfter.timestamp;
             expect(blockNumAfter).to.be.equal(blockNumBefore + 1);
             expect(timestampAfter).to.be.equal(timestampBefore + threeMonths);
-            //============================================================//
-            console.log(ethers.utils.formatEther(await OilcontractFromUser.calculateRoyalsOilRewards(user1.address)));
-            ninty = 8100000.0
-            expect(ethers.utils.formatEther(await OilcontractFromUser.calculateRoyalsOilRewards(user1.address))).to.eq(ninty.toFixed(1));
-        })
+            ninty = 8100000.0;
+            expect(ethers.utils.formatEther(await OilcontractFromUser.calculateOilRewards(user1.address, 2))).to.eq(ninty.toFixed(1));
+        });
 
-        it("Should calculate rewards correctly for 0% bonus for 1 staked", async function(){
-            oil.setRoyalsAddress(royals.address);
+        it("Should calculate rewards correctly for 0% bonus for 1 staked", async function () {
             await royals.setSaleState(2);
             await royals.setBatchSize(10);
             await royals.setMaxMintPerWallet(4);
 
-
-            const RoycontractFromUser = await hre.ethers.getContractAt(
-                "Royals",
-                royals.address,
-                user1
-            );
-            const HabcontractFromUser = await hre.ethers.getContractAt(
-                "Habibi",
-                habibz.address,
-                user1
-            );
-            const OilcontractFromUser = await hre.ethers.getContractAt(
-                "Oil",
-                oil.address,
-                user1
-            );
+            const RoycontractFromUser = await hre.ethers.getContractAt("Royals", royals.address, user1);
+            const HabcontractFromUser = await hre.ethers.getContractAt("Habibi", habibz.address, user1);
+            const OilcontractFromUser = await hre.ethers.getContractAt("Oil", oil.address, user1);
 
             await HabcontractFromUser.mint(3);
             let habibzToBeBurned = [];
             for (i = 0; i < 3; i++) {
                 habibzToBeBurned.push(await HabcontractFromUser.tokenOfOwnerByIndex(user1.address, i));
             }
-            HabcontractFromUser.setApprovalForAll(oil.address,true)
+            HabcontractFromUser.setApprovalForAll(oil.address, true);
             await royals.setAmountRequiredToBurn(3);
             await OilcontractFromUser.stake(habibzToBeBurned);
             await RoycontractFromUser.mint(habibzToBeBurned, []);
-
-            
 
             let balance = await OilcontractFromUser.balanceOf(user1.address);
             console.log("Oil Balance before unstaking: %s", ethers.utils.formatEther(balance));
@@ -452,54 +328,35 @@ describe("Royals", function () {
             const blockNumBefore = await ethers.provider.getBlockNumber();
             const blockBefore = await ethers.provider.getBlock(blockNumBefore);
             const timestampBefore = blockBefore.timestamp;
-            await ethers.provider.send('evm_increaseTime', [sevenDays]);
-            await ethers.provider.send('evm_mine');
+            await ethers.provider.send("evm_increaseTime", [sevenDays]);
+            await ethers.provider.send("evm_mine");
             const blockNumAfter = await ethers.provider.getBlockNumber();
             const blockAfter = await ethers.provider.getBlock(blockNumAfter);
             const timestampAfter = blockAfter.timestamp;
             expect(blockNumAfter).to.be.equal(blockNumBefore + 1);
             expect(timestampAfter).to.be.equal(timestampBefore + sevenDays);
-            //============================================================//
-            console.log(ethers.utils.formatEther(await OilcontractFromUser.calculateRoyalsOilRewards(user1.address)));
-            lessThan30 = 84000.0
-            expect(ethers.utils.formatEther(await OilcontractFromUser.calculateRoyalsOilRewards(user1.address))).to.eq(lessThan30.toFixed(1));
-           
-        })
+            lessThan30 = 84000.0;
+            expect(ethers.utils.formatEther(await OilcontractFromUser.calculateOilRewards(user1.address, 2))).to.eq(lessThan30.toFixed(1));
+        });
 
-        it("Should calculate rewards correctly for 15% bonus for 1 staked", async function(){
-            oil.setRoyalsAddress(royals.address);
+        it("Should calculate rewards correctly for 15% bonus for 1 staked", async function () {
             await royals.setSaleState(2);
             await royals.setBatchSize(10);
             await royals.setMaxMintPerWallet(4);
 
-
-            const RoycontractFromUser = await hre.ethers.getContractAt(
-                "Royals",
-                royals.address,
-                user1
-            );
-            const HabcontractFromUser = await hre.ethers.getContractAt(
-                "Habibi",
-                habibz.address,
-                user1
-            );
-            const OilcontractFromUser = await hre.ethers.getContractAt(
-                "Oil",
-                oil.address,
-                user1
-            );
+            const RoycontractFromUser = await hre.ethers.getContractAt("Royals", royals.address, user1);
+            const HabcontractFromUser = await hre.ethers.getContractAt("Habibi", habibz.address, user1);
+            const OilcontractFromUser = await hre.ethers.getContractAt("Oil", oil.address, user1);
 
             await HabcontractFromUser.mint(3);
             let habibzToBeBurned = [];
             for (i = 0; i < 3; i++) {
                 habibzToBeBurned.push(await HabcontractFromUser.tokenOfOwnerByIndex(user1.address, i));
             }
-            HabcontractFromUser.setApprovalForAll(oil.address,true)
+            HabcontractFromUser.setApprovalForAll(oil.address, true);
             await royals.setAmountRequiredToBurn(3);
             await OilcontractFromUser.stake(habibzToBeBurned);
             await RoycontractFromUser.mint(habibzToBeBurned, []);
-
-            
 
             let balance = await OilcontractFromUser.balanceOf(user1.address);
             console.log("Oil Balance before unstaking: %s", ethers.utils.formatEther(balance));
@@ -511,53 +368,35 @@ describe("Royals", function () {
             const blockNumBefore = await ethers.provider.getBlockNumber();
             const blockBefore = await ethers.provider.getBlock(blockNumBefore);
             const timestampBefore = blockBefore.timestamp;
-            await ethers.provider.send('evm_increaseTime', [oneMonth]);
-            await ethers.provider.send('evm_mine');
+            await ethers.provider.send("evm_increaseTime", [oneMonth]);
+            await ethers.provider.send("evm_mine");
             const blockNumAfter = await ethers.provider.getBlockNumber();
             const blockAfter = await ethers.provider.getBlock(blockNumAfter);
             const timestampAfter = blockAfter.timestamp;
             expect(blockNumAfter).to.be.equal(blockNumBefore + 1);
             expect(timestampAfter).to.be.equal(timestampBefore + oneMonth);
-            //============================================================//
-            console.log(ethers.utils.formatEther(await OilcontractFromUser.calculateRoyalsOilRewards(user1.address)));
-            thirty = 414000
-            expect(ethers.utils.formatEther(await OilcontractFromUser.calculateRoyalsOilRewards(user1.address))).to.eq(thirty.toFixed(1));
-           
-        })
+            thirty = 414000;
+            expect(ethers.utils.formatEther(await OilcontractFromUser.calculateOilRewards(user1.address, 2))).to.eq(thirty.toFixed(1));
+        });
 
-        it("Should calculate rewards correctly for 30% bonus for 1 staked", async function(){
-            oil.setRoyalsAddress(royals.address);
+        it("Should calculate rewards correctly for 30% bonus for 1 staked", async function () {
             await royals.setSaleState(2);
             await royals.setBatchSize(10);
             await royals.setMaxMintPerWallet(4);
 
-            const RoycontractFromUser = await hre.ethers.getContractAt(
-                "Royals",
-                royals.address,
-                user1
-            );
-            const HabcontractFromUser = await hre.ethers.getContractAt(
-                "Habibi",
-                habibz.address,
-                user1
-            );
-            const OilcontractFromUser = await hre.ethers.getContractAt(
-                "Oil",
-                oil.address,
-                user1
-            );
+            const RoycontractFromUser = await hre.ethers.getContractAt("Royals", royals.address, user1);
+            const HabcontractFromUser = await hre.ethers.getContractAt("Habibi", habibz.address, user1);
+            const OilcontractFromUser = await hre.ethers.getContractAt("Oil", oil.address, user1);
 
             await HabcontractFromUser.mint(3);
             let habibzToBeBurned = [];
             for (i = 0; i < 3; i++) {
                 habibzToBeBurned.push(await HabcontractFromUser.tokenOfOwnerByIndex(user1.address, i));
             }
-            HabcontractFromUser.setApprovalForAll(oil.address,true)
+            HabcontractFromUser.setApprovalForAll(oil.address, true);
             await royals.setAmountRequiredToBurn(3);
             await OilcontractFromUser.stake(habibzToBeBurned);
             await RoycontractFromUser.mint(habibzToBeBurned, []);
-
-            
 
             let balance = await OilcontractFromUser.balanceOf(user1.address);
             console.log("Oil Balance before unstaking: %s", ethers.utils.formatEther(balance));
@@ -569,52 +408,35 @@ describe("Royals", function () {
             const blockNumBefore = await ethers.provider.getBlockNumber();
             const blockBefore = await ethers.provider.getBlock(blockNumBefore);
             const timestampBefore = blockBefore.timestamp;
-            await ethers.provider.send('evm_increaseTime', [twoMonth]);
-            await ethers.provider.send('evm_mine');
+            await ethers.provider.send("evm_increaseTime", [twoMonth]);
+            await ethers.provider.send("evm_mine");
             const blockNumAfter = await ethers.provider.getBlockNumber();
             const blockAfter = await ethers.provider.getBlock(blockNumAfter);
             const timestampAfter = blockAfter.timestamp;
             expect(blockNumAfter).to.be.equal(blockNumBefore + 1);
             expect(timestampAfter).to.be.equal(timestampBefore + twoMonth);
-            //============================================================//
-            console.log(ethers.utils.formatEther(await OilcontractFromUser.calculateRoyalsOilRewards(user1.address)));
-            sixty = 936000
-            expect(ethers.utils.formatEther(await OilcontractFromUser.calculateRoyalsOilRewards(user1.address))).to.eq(sixty.toFixed(1));
-        })
+            sixty = 936000;
+            expect(ethers.utils.formatEther(await OilcontractFromUser.calculateOilRewards(user1.address, 2))).to.eq(sixty.toFixed(1));
+        });
 
-        it("Should calculate rewards correctly for 100% bonus for 1 staked and claims correct amount", async function(){
-            oil.setRoyalsAddress(royals.address);
+        it.only("Should calculate rewards correctly for 100% bonus for 1 staked and claims correct amount", async function () {
             await royals.setSaleState(2);
             await royals.setBatchSize(10);
             await royals.setMaxMintPerWallet(4);
 
-            const RoycontractFromUser = await hre.ethers.getContractAt(
-                "Royals",
-                royals.address,
-                user1
-            );
-            const HabcontractFromUser = await hre.ethers.getContractAt(
-                "Habibi",
-                habibz.address,
-                user1
-            );
-            const OilcontractFromUser = await hre.ethers.getContractAt(
-                "Oil",
-                oil.address,
-                user1
-            );
+            const RoycontractFromUser = await hre.ethers.getContractAt("Royals", royals.address, user1);
+            const HabcontractFromUser = await hre.ethers.getContractAt("Habibi", habibz.address, user1);
+            const OilcontractFromUser = await hre.ethers.getContractAt("Oil", oil.address, user1);
 
             await HabcontractFromUser.mint(3);
             let habibzToBeBurned = [];
             for (i = 0; i < 3; i++) {
                 habibzToBeBurned.push(await HabcontractFromUser.tokenOfOwnerByIndex(user1.address, i));
             }
-            HabcontractFromUser.setApprovalForAll(oil.address,true)
+            HabcontractFromUser.setApprovalForAll(oil.address, true);
             await royals.setAmountRequiredToBurn(3);
             await OilcontractFromUser.stake(habibzToBeBurned);
             await RoycontractFromUser.mint(habibzToBeBurned, []);
-
-            
 
             let balance = await OilcontractFromUser.balanceOf(user1.address);
             console.log("Oil Balance before unstaking: %s", ethers.utils.formatEther(balance));
@@ -626,27 +448,24 @@ describe("Royals", function () {
             const blockNumBefore = await ethers.provider.getBlockNumber();
             const blockBefore = await ethers.provider.getBlock(blockNumBefore);
             const timestampBefore = blockBefore.timestamp;
-            await ethers.provider.send('evm_increaseTime', [threeMonths]);
-            await ethers.provider.send('evm_mine');
+            await ethers.provider.send("evm_increaseTime", [threeMonths]);
+            await ethers.provider.send("evm_mine");
             const blockNumAfter = await ethers.provider.getBlockNumber();
             const blockAfter = await ethers.provider.getBlock(blockNumAfter);
             const timestampAfter = blockAfter.timestamp;
             expect(blockNumAfter).to.be.equal(blockNumBefore + 1);
             expect(timestampAfter).to.be.equal(timestampBefore + threeMonths);
             //============================================================//
-            
-            console.log("Oil rewards: %s",ethers.utils.formatEther(await OilcontractFromUser.calculateRoyalsOilRewards(user1.address)));
-            ninty = 2160000.0
-            expect(ethers.utils.formatEther(await OilcontractFromUser.calculateRoyalsOilRewards(user1.address))).to.eq(ninty.toFixed(1));
+
+            console.log("Oil rewards: %s", ethers.utils.formatEther(await OilcontractFromUser.calculateOilRewards(user1.address, 2)));
+            ninty = 2160000.0;
+            expect(ethers.utils.formatEther(await OilcontractFromUser.calculateOilRewards(user1.address, 2))).to.eq(ninty.toFixed(1));
 
             expectedBalance = balance + ninty;
 
-            await OilcontractFromUser.claimRoyal()
-            console.log(ethers.utils.formatEther(await OilcontractFromUser.balanceOf(user1.address)) / 1)
-            expect(ethers.utils.formatEther(await OilcontractFromUser.balanceOf(user1.address))).to.equal(expectedBalance)
-        })
-
-
-
-    })
+            await OilcontractFromUser.claim();
+            console.log(ethers.utils.formatEther(await OilcontractFromUser.balanceOf(user1.address)) / 1);
+            expect(ethers.utils.formatEther(await OilcontractFromUser.balanceOf(user1.address))).to.equal(expectedBalance);
+        });
+    });
 });
