@@ -107,7 +107,7 @@ contract Oil {
     //////////////////////////////////////////////////////////////*/
 
     function initialize(address habibi_,address royals_, address treasury_) external {
-        require(msg.sender == ruler, "NOT ALLOWED TO RULE");
+        
         ruler = msg.sender;
         treasury = treasury_;
         habibi = ERC721Like(habibi_);
